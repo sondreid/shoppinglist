@@ -1,0 +1,11 @@
+FROM mcr.microsoft.com/dotnet/sdk as build
+COPY . ./backend
+WORKDIR /backend
+RUN dotnet restore
+RUN dotnet publish -o /publish
+ 
+FROM mcr.microsoft.com/dotnet/aspnet as base
+COPY --from=build  /publish /backend
+WORKDIR /backend
+EXPOSE 5058
+CMD ["./handleliste"]

@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  api:
+    container_name: handleliste-api
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:5058"
+    networks:
+      - handleliste-network
+
+  # webapp:
+  #   container_name: handleliste-webapp
+  #   build:
+  #     context: ./src/frontend
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "4000:4000"
+  #   networks:
+  #     - handleliste-network
+
+networks:
+  handleliste-network:
+    name: handleliste-network
+    driver: bridge
