@@ -1,27 +1,36 @@
-version: '3.8'
+version: '3.9'
 
 services:
   api:
-    container_name: handleliste-api
     build:
       context: ./src/backend
       dockerfile: Dockerfile
     ports:
-      - "8000:5058"
-    networks:
-      - handleliste-network
+      - 5058:5058
+    # networks:
+    #   - handlelistenet
 
-  # webapp:
-  #   container_name: handleliste-webapp
-  #   build:
-  #     context: ./src/frontend
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "4000:4000"
-  #   networks:
-  #     - handleliste-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://api:5058/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  webapp:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    environment:
+      API_URL: api
+    ports:
+      - 4000:4000
+    depends_on:
+      - api
+    links: 
+      - api
+    # networks:
+    #   - handlelistenet
+    
 
 networks:
-  handleliste-network:
-    name: handleliste-network
-    driver: bridge
+  handlelistenet:
