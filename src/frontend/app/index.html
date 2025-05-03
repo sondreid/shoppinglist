@@ -41,7 +41,10 @@
 
       <input type="text" class="form-control" id="newItemInput" placeholder="Ny vare" 
         onkeypress="if(event.key === 'Enter') addItem(); " onblur="addItem()">
-    </div>
+  
+
+
+
   </div>
   <script>
     let itemCount = 1;
@@ -51,7 +54,7 @@
       const newItemInput = document.getElementById('newItemInput');
       const itemText = newItemInput.value;
       
-      if (!itemText.trim()) return; // Don't add empty items
+      if (!itemText.trim()) return; 
       
       const newItem = document.createElement('div');
       newItem.className = 'form-check';
@@ -81,7 +84,6 @@
     }
   </script>
 
-  </div>
 
 
 

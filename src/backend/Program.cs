@@ -2,11 +2,15 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.OpenApi.Models;
+using Microsoft.EntityFrameworkCore;
 
 
 const string allow_origins = "frontend_ports";
 
+
+
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddDbContext<ShoppingItemDB>(opt => opt.UseInMemoryDatabase("ShoppingList"));
 
 
 builder.Services.AddControllers();
@@ -32,19 +36,49 @@ var app = builder.Build();
 //app.MapControllers();
 
 app.UseCors(allow_origins);
+app.MapGet("/helloworld", () => new { payload = "hello world" });
+app.MapPost("/exampleitem", async (ShoppingItemDB db) =>
+{
+    var existingItem = await db.ShoppingItems.FirstOrDefaultAsync(x => x.Id == 1);
+    if (existingItem != null)
+    {
+        return Results.Conflict("An item with this ID already exists");
+    }
 
-app.MapGet("/", () => new { payload = "hello world" });
-app.MapPost("/storeitem", async (HttpContext context) =>
+    var exampleItem = new ShoppingItem 
+    { 
+        Id = 1,
+        Name = "Example Item",
+        IsComplete = false 
+    };
+    db.ShoppingItems.Add(exampleItem);
+    await db.SaveChangesAsync();
+    return Results.Created($"/shoppingitems/{exampleItem.Id}", exampleItem);
+});
+
+
+app.MapGet("/shoppingitems", async (ShoppingItemDB db) =>
+    await db.ShoppingItems.ToListAsync());
+
+    
+app.MapPost("/storeitem", async (HttpContext context, ShoppingItemDB db) =>
 {
     try 
     {
         using var reader = new StreamReader(context.Request.Body);
-        var jsonBody = await reader.ReadToEndAsync();
-        console.WriteLine(jsonBody);
-        string filePath = "items.json";
-        await File.WriteAllTextAsync(filePath, jsonBody);
+        var payloadBody = await reader.ReadToEndAsync();
+        var jsonDocument = System.Text.Json.JsonDocument.Parse(payloadBody);
+        var payloadBody = jsonDocument.RootElement.GetProperty("item").GetString();
         
-        return Results.Json(new { success = true, message = $"Data stored successfully {jsonBody}" });
+        var shoppingItem = new ShoppingItem
+        {
+            Name = payloadBody,
+            IsComplete = false
+        };
+        db.ShoppingItems.Add(shoppingItem);
+        await db.SaveChangesAsync();
+        
+        return Results.Json(new { success = true, message = $"Data stored successfully {payloadBody}" });
     }
     catch (Exception ex)
     {

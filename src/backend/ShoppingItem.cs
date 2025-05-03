@@ -1,6 +1,4 @@
-namespace backend.Models;
-
-public class TodoItem
+public class ShoppingItem
 {
     public long Id { get; set; }
     public string? Name { get; set; }
