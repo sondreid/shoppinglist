@@ -61,15 +61,26 @@ app.MapGet("/shoppingitems", async (ShoppingItemDB db) =>
     await db.ShoppingItems.ToListAsync());
 
     
-app.MapPost("/storeitem", async (HttpContext context, ShoppingItemDB db) =>
+app.MapPost("/shoppingitem", async (HttpContext context, ShoppingItemDB db) =>
 {
     try 
     {
         using var reader = new StreamReader(context.Request.Body);
-        var payloadBody = await reader.ReadToEndAsync();
-        var jsonDocument = System.Text.Json.JsonDocument.Parse(payloadBody);
-        var payloadBody = jsonDocument.RootElement.GetProperty("item").GetString();
-        
+        var body = await reader.ReadToEndAsync();
+        using var jsonDocument = System.Text.Json.JsonDocument.Parse(body);
+
+        if (!jsonDocument.RootElement.TryGetProperty("item", out var itemElement))
+        {
+            return Results.Json(new { success = false, message = "Missing 'item' property in payload." }, statusCode: 400);
+        }
+
+        var payloadBody = itemElement.GetString();
+
+        if (string.IsNullOrWhiteSpace(payloadBody))
+        {
+            return Results.Json(new { success = false, message = "'item' cannot be blank." }, statusCode: 400);
+        }
+
         var shoppingItem = new ShoppingItem
         {
             Name = payloadBody,
@@ -78,7 +89,7 @@ app.MapPost("/storeitem", async (HttpContext context, ShoppingItemDB db) =>
         db.ShoppingItems.Add(shoppingItem);
         await db.SaveChangesAsync();
         
-        return Results.Json(new { success = true, message = $"Data stored successfully {payloadBody}" });
+        return Results.Json(new { success = true, message = $"Data stored successfully: {payloadBody}" });
     }
     catch (Exception ex)
     {
@@ -87,26 +98,28 @@ app.MapPost("/storeitem", async (HttpContext context, ShoppingItemDB db) =>
 });
 
 
-app.MapDelete("/deleteitem", async (HttpContext context) =>
+app.MapPut("/shoppingitem/{id}", async (HttpContext context, int id, ShoppingItem updatedItem, ShoppingItemDB db) =>
 {
-    try 
-    {
-        string filePath = "items.json";
-        if (File.Exists(filePath))
-        {
-            File.Delete(filePath);
-            return Results.Json(new { success = true, message = "File deleted successfully" });
-        }
-        else
-        {
-            return Results.Json(new { success = false, message = "File not found" }, statusCode: 404);
-        }
-    }
-    catch (Exception ex)
-    {
-        return Results.Json(new { success = false, message = ex.Message }, statusCode: 500);
-    }
+    var item = await db.ShoppingItems.FindAsync(id);
+    if (item == null) return Results.NotFound();
+    item.Name = updatedItem.Name;
+    item.IsComplete = updatedItem.IsComplete;
+    await db.SaveChangesAsync();
+    return Results.Json(new { success = true, message = $"Updated item  {id}" });
+
+    
 });
+
+app.MapDelete("/item/{id}", async (int id, ShoppingItemDB db) =>
+{
+    var item = await db.ShoppingItems.FindAsync(id);
+    if (item is null) return Results.NotFound();
+
+    db.ShoppingItems.Remove(item);
+    await db.SaveChangesAsync();
+    return Results.Json(new { success = true, message = $"Deleted item  {id}" });
+});
+
 
 
 app.Use(async (context, next) =>    
