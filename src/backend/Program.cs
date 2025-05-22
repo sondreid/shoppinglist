@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using handleliste.Hubs;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.OpenApi.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,6 +16,7 @@ builder.Services.AddDbContext<ShoppingItemDB>(opt => opt.UseInMemoryDatabase("Sh
 
 
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -33,9 +36,12 @@ builder.Services.AddCors(options =>
 
 
 var app = builder.Build();
-//app.MapControllers();
 
+app.MapHub<ItemHub>("/itemhub");
 app.UseCors(allow_origins);
+
+
+
 app.MapGet("/helloworld", () => new { payload = "hello world" });
 app.MapPost("/exampleitem", async (ShoppingItemDB db) =>
 {
@@ -60,41 +66,19 @@ app.MapPost("/exampleitem", async (ShoppingItemDB db) =>
 app.MapGet("/shoppingitems", async (ShoppingItemDB db) =>
     await db.ShoppingItems.ToListAsync());
 
-    
-app.MapPost("/shoppingitem", async (HttpContext context, ShoppingItemDB db) =>
+app.MapPost("/shoppingitem", async (HttpContext context, ShoppingItem item, ShoppingItemDB db,  IHubContext<ItemHub> hubContext) => 
 {
-    try 
-    {
-        using var reader = new StreamReader(context.Request.Body);
-        var body = await reader.ReadToEndAsync();
-        using var jsonDocument = System.Text.Json.JsonDocument.Parse(body);
+		
+    if (item.Equals(null)) return Results.NotFound();
+    if (item.Name == null) return Results.Json(new { success = false, message = "Missing 'item' property in payload." }, statusCode: 400);
+    
+    db.ShoppingItems.Add(item);
+    await db.SaveChangesAsync();
+    // Notify all clients about the new item using SignalR
+    await hubContext.Clients.All.SendAsync("ReceiveNewItem", item);
+    return Results.Json(new { success = true, message = $"Data stored successfully: {item}" });
 
-        if (!jsonDocument.RootElement.TryGetProperty("item", out var itemElement))
-        {
-            return Results.Json(new { success = false, message = "Missing 'item' property in payload." }, statusCode: 400);
-        }
 
-        var payloadBody = itemElement.GetString();
-
-        if (string.IsNullOrWhiteSpace(payloadBody))
-        {
-            return Results.Json(new { success = false, message = "'item' cannot be blank." }, statusCode: 400);
-        }
-
-        var shoppingItem = new ShoppingItem
-        {
-            Name = payloadBody,
-            IsComplete = false
-        };
-        db.ShoppingItems.Add(shoppingItem);
-        await db.SaveChangesAsync();
-        
-        return Results.Json(new { success = true, message = $"Data stored successfully: {payloadBody}" });
-    }
-    catch (Exception ex)
-    {
-        return Results.Json(new { success = false, message = ex.Message }, statusCode: 500);
-    }
 });
 
 
@@ -110,7 +94,7 @@ app.MapPut("/shoppingitem/{id}", async (HttpContext context, int id, ShoppingIte
     
 });
 
-app.MapDelete("/item/{id}", async (int id, ShoppingItemDB db) =>
+app.MapDelete("/shoppingitem/{id}", async (int id, ShoppingItemDB db) =>
 {
     var item = await db.ShoppingItems.FindAsync(id);
     if (item is null) return Results.NotFound();

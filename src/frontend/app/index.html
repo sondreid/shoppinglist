@@ -64,13 +64,14 @@
         `;
       container.appendChild(newItem);
 
-      fetch('http://localhost:5058/storeitem', {
+      fetch('http://localhost:5058/shoppingitem', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          item: itemText
+          Name: itemText,
+          isComplete: false
         })
       })
         .then(response => response.json())
