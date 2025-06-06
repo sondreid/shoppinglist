@@ -9,8 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 const string allow_origins = "frontend_ports";
 
-
-
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ShoppingItemDB>(opt => opt.UseInMemoryDatabase("ShoppingList"));
 
@@ -30,15 +28,21 @@ builder.Services.AddCors(options =>
                       {
                           policy.WithOrigins("http://localhost:4000", "http://localhost:4001", "http://frontend:4000","http://localhost:3000", "http://172.18.0.3:4000", "http://172.18.0.2:4000", "http://172.18.0.2:5058")
                                 .AllowAnyHeader()
-                                .AllowAnyMethod();
+                                .AllowAnyMethod()
+                                .AllowCredentials();
                       });
 });
 
 
 var app = builder.Build();
 
-app.MapHub<ItemHub>("/itemhub");
+
 app.UseCors(allow_origins);
+
+app.UseAuthorization();
+
+app.MapHub<ItemHub>("/itemhub");
+
 
 
 
@@ -74,7 +78,8 @@ app.MapPost("/shoppingitem", async (HttpContext context, ShoppingItem item, Shop
     
     db.ShoppingItems.Add(item);
     await db.SaveChangesAsync();
-    // Notify all clients about the new item using SignalR
+
+    
     await hubContext.Clients.All.SendAsync("ReceiveNewItem", item);
     return Results.Json(new { success = true, message = $"Data stored successfully: {item}" });
 
