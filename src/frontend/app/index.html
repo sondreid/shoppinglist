@@ -13,7 +13,7 @@
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script type="text/javascript" src="js/vendor.min.js"></script>
   <script type="text/javascript" src="js/app.js"></script>
-  <script type="text/javascript" src="js/app.js"></script>
+  <script src="https://unpkg.com/@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
 </head>
 
 
@@ -30,22 +30,103 @@
 
 
 
-  <div class="container mt-4">
-    <div id="checkbox-container">
+    <div class="container mt-4">
+      <div id="checkbox-container">
+      </div>
     </div>
-  </div>
 
 
 
 
 
-      <input type="text" class="form-control" id="newItemInput" placeholder="Ny vare" 
-        onkeypress="if(event.key === 'Enter') addItem(); " onblur="addItem()">
-  
-
+    <input type="text" class="form-control" id="newItemInput" placeholder="New item"
+      onkeypress="if(event.key === 'Enter') addItem(); " onblur="addItem()">
 
 
   </div>
+
+
+  <script>
+
+
+function addItemToForm(item) {
+      console.log("New item created:", item);
+
+      // check if the item already exists in form 
+      const container = document.getElementById('checkbox-container');
+      const newItem = document.createElement('div');
+      newItem.className = 'form-check';
+      newItem.innerHTML = `
+        <input type="checkbox" class="form-check-input" id="item${item.id}">
+        <label class="form-check-label" for="item${item.id}">${item.name}</label>
+    `;
+      container.appendChild(newItem);
+    };
+
+    function loadItems() {
+
+      fetch('http://localhost:5058/shoppingitems', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+        .then(response => response.json())
+        .then(items => {
+          console.log('All items:', items);
+
+        if (!Array.isArray(items)) {
+          throw new Error('Expected an array of items');
+        }
+         items.forEach(item => {
+          
+          console.log("Item:", item);
+          addItemToForm(item);
+            
+         });
+        })
+        .catch((error) => {
+          console.error('Error:', error);
+        });
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      loadItems();
+    });
+
+
+    function addPostShoppingItem(item) {
+      console.log("New item created:", item);
+
+      // check if the item already exists in form 
+
+      const container = document.getElementById('checkbox-container');
+      const newItem = document.createElement('div');
+      newItem.className = 'form-check';
+      newItem.innerHTML = `
+        <input type="checkbox" class="form-check-input" id="item${item.id}">
+        <label class="form-check-label" for="item${item.id}">${item.name}</label>
+    `;
+      container.appendChild(newItem);
+    }
+
+    window.addEventListener('load', () => {
+      const connection = new signalR.HubConnectionBuilder()
+        .withUrl("http://localhost:5058/itemhub")
+        .build();
+
+      connection.start().then(() => {
+        connection.on("ItemCreated", (item) => {
+
+          addPostShoppingItem(item);
+        });
+
+      });
+
+
+    });
+  </script>
+
+
   <script>
     let itemCount = 1;
     function addItem() {
@@ -53,16 +134,16 @@
       const container = document.getElementById('checkbox-container');
       const newItemInput = document.getElementById('newItemInput');
       const itemText = newItemInput.value;
-      
-      if (!itemText.trim()) return; 
-      
-      const newItem = document.createElement('div');
-      newItem.className = 'form-check';
-      newItem.innerHTML = `
-        <input type="checkbox" class="form-check-input" id="item${itemCount}">
-        <label class="form-check-label" for="item${itemCount}">${itemText}</label>
-        `;
-      container.appendChild(newItem);
+
+      if (!itemText.trim()) return;
+
+      // const newItem = document.createElement('div');
+      // newItem.className = 'form-check';
+      // newItem.innerHTML = `
+      //   <input type="checkbox" class="form-check-input" id="item${itemCount}">
+      //   <label class="form-check-label" for="item${itemCount}">${itemText}</label>
+      //   `;
+      // container.appendChild(newItem);
 
       fetch('http://localhost:5058/shoppingitem', {
         method: 'POST',
@@ -77,7 +158,7 @@
         .then(response => response.json())
         .then(data => {
           console.log('Success:', data);
-          newItemInput.value = ''; // Clear input after successful add
+          newItemInput.value = '';
         })
         .catch((error) => {
           console.error('Error:', error);
@@ -90,7 +171,7 @@
 
 
 
- 
+
 </body>
 
 </html>
