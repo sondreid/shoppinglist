@@ -49,15 +49,15 @@
   <script>
 
 
-function addItemToForm(item) {
+    function addItemToForm(item) {
+
       console.log("New item created:", item);
 
-      // check if the item already exists in form 
       const container = document.getElementById('checkbox-container');
       const newItem = document.createElement('div');
       newItem.className = 'form-check';
       newItem.innerHTML = `
-        <input type="checkbox" class="form-check-input" id="item${item.id}">
+        <input type="checkbox" class="form-check-input" id="item${item.id}" onchange="updateItem(${item.id})">
         <label class="form-check-label" for="item${item.id}">${item.name}</label>
     `;
       container.appendChild(newItem);
@@ -75,15 +75,15 @@ function addItemToForm(item) {
         .then(items => {
           console.log('All items:', items);
 
-        if (!Array.isArray(items)) {
-          throw new Error('Expected an array of items');
-        }
-         items.forEach(item => {
-          
-          console.log("Item:", item);
-          addItemToForm(item);
-            
-         });
+          if (!Array.isArray(items)) {
+            throw new Error('Expected an array of items');
+          }
+          items.forEach(item => {
+
+            console.log("Item:", item);
+            addItemToForm(item);
+
+          });
         })
         .catch((error) => {
           console.error('Error:', error);
@@ -93,17 +93,35 @@ function addItemToForm(item) {
       loadItems();
     });
 
+    function updateItem(itemId) {
+      console.log("Item updated:", itemId);
 
-    function addPostShoppingItem(item) {
+      let isComplete = document.getElementById(`item${itemId}`).checked;
+      console.log("Is complete:", isComplete);
+      fetch(`http://localhost:5058/shoppingitem/${itemId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: itemId,
+          isComplete: isComplete
+        })
+      })
+        .then(response => response.json())
+        .catch((error) => {
+          console.error('Error:', error);
+        });
+    };
+
+function addPostShoppingItem(item) {
       console.log("New item created:", item);
-
-      // check if the item already exists in form 
 
       const container = document.getElementById('checkbox-container');
       const newItem = document.createElement('div');
       newItem.className = 'form-check';
       newItem.innerHTML = `
-        <input type="checkbox" class="form-check-input" id="item${item.id}">
+        <input type="checkbox" class="form-check-input" id="item${item.id}" onchange="updateItem(${item.id})">
         <label class="form-check-label" for="item${item.id}">${item.name}</label>
     `;
       container.appendChild(newItem);
@@ -117,7 +135,7 @@ function addItemToForm(item) {
       connection.start().then(() => {
         connection.on("ItemCreated", (item) => {
 
-          addPostShoppingItem(item);
+          addItemToForm(item);
         });
 
       });
@@ -136,14 +154,6 @@ function addItemToForm(item) {
       const itemText = newItemInput.value;
 
       if (!itemText.trim()) return;
-
-      // const newItem = document.createElement('div');
-      // newItem.className = 'form-check';
-      // newItem.innerHTML = `
-      //   <input type="checkbox" class="form-check-input" id="item${itemCount}">
-      //   <label class="form-check-label" for="item${itemCount}">${itemText}</label>
-      //   `;
-      // container.appendChild(newItem);
 
       fetch('http://localhost:5058/shoppingitem', {
         method: 'POST',
