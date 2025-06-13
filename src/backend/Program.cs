@@ -18,7 +18,7 @@ builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Handleliste API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Shoppingliste API", Version = "v1" });
 });
 
 builder.Services.AddCors(options =>
@@ -67,10 +67,13 @@ app.MapPost("/exampleitem", async (ShoppingItemDB db) =>
 });
 
 
+app.MapGet("/activeshoppingitems", async (ShoppingItemDB db) =>
+    await db.ShoppingItems.Where(item => item.IsComplete).ToListAsync());
+
 app.MapGet("/shoppingitems", async (ShoppingItemDB db) =>
     await db.ShoppingItems.ToListAsync());
 
-app.MapPost("/shoppingitem", async (HttpContext context, ShoppingItem item, ShoppingItemDB db,  IHubContext<ItemHub> hubContext) => 
+app.MapPost("/shoppingitem", async (ShoppingItem item, ShoppingItemDB db,  IHubContext<ItemHub> hubContext) => 
 {
 		
     if (item.Equals(null)) return Results.NotFound();
@@ -79,21 +82,21 @@ app.MapPost("/shoppingitem", async (HttpContext context, ShoppingItem item, Shop
     db.ShoppingItems.Add(item);
     await db.SaveChangesAsync();
 
-    
-    await hubContext.Clients.All.SendAsync("ReceiveNewItem", item);
+    await hubContext.Clients.All.SendAsync("ItemCreated", item);
     return Results.Json(new { success = true, message = $"Data stored successfully: {item}" });
 
 
 });
 
 
-app.MapPut("/shoppingitem/{id}", async (HttpContext context, int id, ShoppingItem updatedItem, ShoppingItemDB db) =>
+app.MapPut("/shoppingitem/{id}", async (IHubContext<ItemHub> hubContext, int id, ShoppingItem updatedItem, ShoppingItemDB db) =>
 {
     var item = await db.ShoppingItems.FindAsync(id);
     if (item == null) return Results.NotFound();
     item.Name = updatedItem.Name;
     item.IsComplete = updatedItem.IsComplete;
     await db.SaveChangesAsync();
+    await hubContext.Clients.All.SendAsync("ItemUpdated", item);
     return Results.Json(new { success = true, message = $"Updated item  {id}" });
 
     
