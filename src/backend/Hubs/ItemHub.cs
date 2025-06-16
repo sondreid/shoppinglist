@@ -20,12 +20,7 @@ namespace handleliste.Hubs
         {
             await Clients.All.SendAsync("ItemAdded", item);
         }
-
-        public async Task UpdateItem(ShoppingItem item)
-        {
-            Console.WriteLine(item);
-            await Clients.All.SendAsync("UpdateItem", item);
-        }
+        
 
         public async Task SendNotification(string content)
         {

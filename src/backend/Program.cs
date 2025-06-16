@@ -132,7 +132,7 @@ app.MapGet("/health", () => new { payload = "A-okay" });
 
 if ( Environment.GetEnvironmentVariable("dev") != "true")
 {
-   app.Run("http://0.0.0.0:5058");
+    app.Run("http://0.0.0.0:5058");
 }
 
 else

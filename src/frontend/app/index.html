@@ -70,160 +70,6 @@
 
     <script>
 
-
-      function addItemToForm(item) {
-
-        console.log("New item created:", item);
-
-        const container = document.getElementById('checkbox-container');
-        const newItem = document.createElement('div');
-        newItem.className = 'form-check';
-        newItem.innerHTML = `
-        <input type="checkbox" class="form-check-input" id="item${item.id}" onchange="updateItem(${item.id})">
-        <label class="form-check-label" for="item${item.id}">${item.name}</label>
-    `;
-        container.appendChild(newItem);
-      };
-
-      function loadItems() {
-
-        fetch('http://localhost:5058/shoppingitems', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        })
-          .then(response => response.json())
-          .then(items => {
-
-
-            if (!Array.isArray(items)) {
-              throw new Error('Expected an array of items');
-            }
-            items.forEach(item => {
-              console.log("Item:", item);
-              if (item.isComplete) {
-                console.log("Item is complete:", item);
-                addItemToCheckMarked(item);
-              }
-              else {
-                addItemToForm(item);
-              }
-
-            });
-          })
-          .catch((error) => {
-            console.error('Error:', error);
-          });
-      }
-      document.addEventListener('DOMContentLoaded', function () {
-        loadItems();
-      });
-
-
-      function removeItem() {
-        var list = document.querySelectorAll('#checkbox-container input:checked');
-        list.forEach(function (chk) {
-          chk.parentNode.remove();
-        });
-      };
-
-
-      function updateItem(itemId) {
-        console.log("Item updated:", itemId);
-
-
-        let isComplete = document.getElementById(`item${itemId}`).checked;
-        let newItem = JSON.stringify({
-          id: itemId,
-          name: document.querySelector(`label[for="item${itemId}"]`).textContent,
-          isComplete: isComplete
-        });
-        console.log("Is complete:", isComplete);
-        // const connection = new signalR.HubConnectionBuilder()
-        //   .withUrl("http://localhost:5058/itemhub")
-        //   .build();
-        // connection.start().then(() => {
-        //   connection.invoke("UpdateItem", newItem)
-        //     .catch(err => console.error(err.toString()));
-        // });
-
-
-        fetch(`http://localhost:5058/shoppingitem/${itemId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: newItem
-        })
-          .then(response => response.json()
-          ).then(data => {
-            console.log('Success:', data);
-
-          })
-          .catch((error) => {
-            console.error('Error:', error);
-          });
-
-        removeItem();
-
-      };
-
-      function addPostShoppingItem(item) {
-        console.log("New item created:", item);
-
-        const container = document.getElementById('checkbox-container');
-        const newItem = document.createElement('div');
-        newItem.className = 'form-check';
-        newItem.innerHTML = `
-        <input type="checkbox" class="form-check-input" id="item${item.id}" onchange="updateItem(${item.id})">
-        <label class="form-check-label" for="item${item.id}">${item.name}</label>
-    `;
-        container.appendChild(newItem);
-      }
-
-      function addItemToCheckMarked(item) {
-        let checkedContainer = document.getElementById('checked-items-container');
-        // Add the item as plain text (no checkbox)
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'checked-item';
-        itemDiv.textContent = item.name;
-        checkedContainer.appendChild(itemDiv);
-      };
-      window.addEventListener('load', () => {
-        const connection = new signalR.HubConnectionBuilder()
-          .withUrl("http://localhost:5058/itemhub")
-          .build();
-
-        connection.start().then(() => {
-          connection.on("ItemCreated", (item) => {
-
-            addItemToForm(item);
-          });
-
-        });
-      });
-
-      window.addEventListener('load', () => {
-        const connection = new signalR.HubConnectionBuilder()
-          .withUrl("http://localhost:5058/itemhub")
-          .build();
-
-        connection.start().then(() => {
-          connection.on("ItemUpdated", (item) => {
-            console.log("Item updated via SignalR:", item);
-            addItemToCheckMarked(item);
-          });
-
-        });
-      });
-
-
-
-    </script>
-
-
-    <script>
       let itemCount = 1;
       function addItem() {
         itemCount++;
@@ -252,6 +98,137 @@
             console.error('Error:', error);
           });
       }
+
+
+
+      function loadItems() {
+
+        fetch('http://localhost:5058/shoppingitems', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        })
+          .then(response => response.json())
+          .then(items => {
+
+
+            if (!Array.isArray(items)) {
+              throw new Error('Expected an array of items');
+            }
+            items.forEach(item => {
+              console.log("Item:", item);
+              if (item.isComplete) {
+                console.log("Item is complete:", item);
+                addItemToCheckMarked(item);
+              }
+              else {
+                shoppingList.addItemToForm(item);
+              }
+
+            });
+          })
+          .catch((error) => {
+            console.error('Error:', error);
+          });
+      }
+      document.addEventListener('DOMContentLoaded', function () {
+        console.log("DOM fully loaded and parsed");
+        loadItems();
+      });
+
+
+      // function removeItem() {
+      //   var list = document.querySelectorAll('#checkbox-container input:checked');
+      //   list.forEach(function (chk) {
+      //     chk.parentNode.remove();
+      //   });
+      // };
+
+
+      function updateItem(itemId) {
+        console.log("Item updated:", itemId);
+
+
+        let isComplete = document.getElementById(`item${itemId}`).checked;
+        let newItem = JSON.stringify({
+          id: itemId,
+          name: document.querySelector(`label[for="item${itemId}"]`).textContent,
+          isComplete: isComplete
+        });
+        console.log("Is complete:", isComplete);
+
+        fetch(`http://localhost:5058/shoppingitem/${itemId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: newItem
+        })
+          .then(response => response.json()
+          ).then(data => {
+            console.log('Success:', data);
+
+          })
+          .catch((error) => {
+            console.error('Error:', error);
+          });
+
+
+      };
+
+      function addPostShoppingItem(item) {
+        console.log("New item created:", item);
+
+        const container = document.getElementById('checkbox-container');
+        const newItem = document.createElement('div');
+        newItem.className = 'form-check';
+        newItem.innerHTML = `
+        <input type="checkbox" class="form-check-input" id="item${item.id}" onchange="updateItem(${item.id})">
+        <label class="form-check-label" for="item${item.id}">${item.name}</label>
+    `;
+        container.appendChild(newItem);
+      }
+
+      function addItemToCheckMarked(item) {
+
+        let checkedContainer = document.getElementById('checked-items-container');
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'checked-item';
+        itemDiv.textContent = item.name;
+        checkedContainer.appendChild(itemDiv);
+      };
+
+
+      // Connections 
+      window.addEventListener('load', () => {
+        const connection = new signalR.HubConnectionBuilder()
+          .withUrl("http://localhost:5058/itemhub")
+          .build();
+
+        connection.start().then(() => {
+          connection.on("ItemCreated", (item) => {
+            console.log("Item created via SignalR:", item);
+            shoppingList.addItemToForm(item);
+          });
+          connection.on("ItemUpdated", (item) => {
+            console.log("Item updated via SignalR:", item);
+
+            if (item.isComplete) {
+              const checkboxDiv = document.getElementById(`item${item.id}`)?.parentNode;
+              if (checkboxDiv) {
+                //checkboxDiv.remove();
+              }
+              addItemToCheckMarked(item);
+
+            }
+          });
+
+        });
+      });
+
+
+
     </script>
 
 

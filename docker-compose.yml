@@ -7,9 +7,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - 5058:5058
-    # networks:
-    #   - handlelistenet
 
+    environment:
+     - dev=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://api:5058/health"]
       interval: 30s
@@ -28,9 +28,6 @@ services:
       - api
     links: 
       - api
-    # networks:
-    #   - handlelistenet
-    
 
 networks:
   handlelistenet:
