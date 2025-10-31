@@ -1,0 +1,14 @@
+services:
+  api:
+    build:
+      context: https://github.com/sondreid/shoppinglist.git#master:src/backend
+      args:
+        GIT_ACCESS_TOKEN: ${SHOPPING_LIST_KEY}
+      dockerfile: Dockerfile
+
+  webapp:
+    build:
+      context: https://github.com/sondreid/shoppinglist.git#master:src/frontend
+      args:
+        GIT_ACCESS_TOKEN: ${SHOPPING_LIST_KEY}
+      dockerfile: Dockerfile

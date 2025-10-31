@@ -1,4 +1,4 @@
-﻿using handleliste.Hubs;
+using handleliste.Hubs;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
@@ -26,7 +26,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: allow_origins,
                       policy  =>
                       {
-                          policy.WithOrigins("http://localhost:4000", "http://localhost:4001", "http://frontend:4000","http://localhost:3000", "http://172.18.0.3:4000", "http://172.18.0.2:4000", "http://172.18.0.2:5058")
+                          policy.WithOrigins("http://localhost:4000", "http://localhost:4001", "http://frontend:4000","http://localhost:3000")
                                 .AllowAnyHeader()
                                 .AllowAnyMethod()
                                 .AllowCredentials();
@@ -67,18 +67,23 @@ app.MapPost("/exampleitem", async (ShoppingItemDB db) =>
 });
 
 
-app.MapGet("/activeshoppingitems", async (ShoppingItemDB db) =>
+app.MapGet("/completedshoppingitems", async (ShoppingItemDB db) =>
     await db.ShoppingItems.Where(item => item.IsComplete).ToListAsync());
 
+app.MapGet("/uncompletedshoppingitems", async (ShoppingItemDB db) =>
+    await db.ShoppingItems.Where(item => !item.IsComplete).ToListAsync());
+
+
 app.MapGet("/shoppingitems", async (ShoppingItemDB db) =>
-    await db.ShoppingItems.ToListAsync());
+    await db.ShoppingItems.OrderBy(item => item.UpdatedAt).ToListAsync());
 
 app.MapPost("/shoppingitem", async (ShoppingItem item, ShoppingItemDB db,  IHubContext<ItemHub> hubContext) => 
 {
 		
     if (item.Equals(null)) return Results.NotFound();
     if (item.Name == null) return Results.Json(new { success = false, message = "Missing 'item' property in payload." }, statusCode: 400);
-    
+
+    item.UpdatedAt = DateTime.UtcNow;
     db.ShoppingItems.Add(item);
     await db.SaveChangesAsync();
 

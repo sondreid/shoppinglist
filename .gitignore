@@ -3,3 +3,5 @@
 *.idea
 docker.txt
 docker-deployment
+*.env
+.cursor
