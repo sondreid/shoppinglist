@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddDbContext<ShoppingItemDB>(opt => opt.UseInMemoryDatabase("ShoppingList"));
+builder.Services.AddDbContext<ShoppingItemDB>(opt => opt.UseSqlite("Data Source=shoppinglist.db"));
 
 
 builder.Services.AddControllers();
@@ -38,6 +38,12 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ShoppingItemDB>();
+    db.Database.EnsureCreated();
+}
 
 app.UseCors(allow_origins);
 
@@ -70,47 +76,27 @@ app.MapPost("/exampleitem", async (ShoppingItemDB db) =>
 
 
 
-app.MapPost("/imageupload", async (ImageRequest request, IHubContext<ItemHub> hubContext) =>
-{
-    if (string.IsNullOrEmpty(request.Base64Image) || string.IsNullOrEmpty(request.ContentType))
-    {
-        return Results.BadRequest("Missing base64Image or contentType");
-    }
-      
-    var imageBinary = Convert.FromBase64String(request.Base64Image);
-    if (imageBinary.Length == 0)
-    {
-        return Results.BadRequest("Invalid image data");
-    }
-      
-    var image = new ImageMessage 
-    { 
-        FileName = "uploaded_image",  // Or derive from contentType, e.g., $"image.{request.ContentType.Split('/')[1]}"
-        ContentType = request.ContentType, 
-        ImageBinary = imageBinary 
-    };
-
-    Console.WriteLine($"Image received: {image.ContentType}");
-    await hubContext.Clients.All.SendAsync("ImageSent", image);
-    return Results.Json(new { success = true, message = "Image stored successfully" });
-});
 
 
 app.MapGet("/completedshoppingitems", async (ShoppingItemDB db) =>
-    await db.ShoppingItems.Where(item => item.IsComplete).ToListAsync());
+    await db.ShoppingItems.Include(item => item.Image).Where(item => item.IsComplete).ToListAsync());
 
 app.MapGet("/uncompletedshoppingitems", async (ShoppingItemDB db) =>
-    await db.ShoppingItems.Where(item => !item.IsComplete).ToListAsync());
-
+    await db.ShoppingItems.Include(item => item.Image).Where(item => !item.IsComplete).ToListAsync());
 
 app.MapGet("/shoppingitems", async (ShoppingItemDB db) =>
-    await db.ShoppingItems.OrderBy(item => item.UpdatedAt).ToListAsync());
+    await db.ShoppingItems.Include(item => item.Image).OrderBy(item => item.UpdatedAt).ToListAsync());
 
 app.MapPost("/shoppingitem", async (ShoppingItem item, ShoppingItemDB db,  IHubContext<ItemHub> hubContext) => 
 {
-		
     if (item.Equals(null)) return Results.NotFound();
-    if (item.Name == null) return Results.Json(new { success = false, message = "Missing 'item' property in payload." }, statusCode: 400);
+    
+    if (!item.IsImage && string.IsNullOrEmpty(item.Name)) 
+        return Results.Json(new { success = false, message = "Missing 'name' property in payload." }, statusCode: 400);
+    
+
+    if (item.IsImage && (item.Image == null || string.IsNullOrEmpty(item.Image.ContentType)))
+        return Results.Json(new { success = false, message = "Missing image data for image item." }, statusCode: 400);
 
     item.UpdatedAt = DateTime.UtcNow;
     db.ShoppingItems.Add(item);
@@ -118,8 +104,6 @@ app.MapPost("/shoppingitem", async (ShoppingItem item, ShoppingItemDB db,  IHubC
 
     await hubContext.Clients.All.SendAsync("ItemCreated", item);
     return Results.Json(new { success = true, message = $"Data stored successfully: {item}" });
-
-
 });
 
 

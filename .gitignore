@@ -5,3 +5,5 @@ docker.txt
 docker-deployment
 *.env
 .cursor
+*.db*
+*.DS*
