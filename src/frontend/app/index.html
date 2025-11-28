@@ -36,8 +36,14 @@
 
 
       <div class="row">
+        <div class = "col">
         <input type="text" class="form-control" id="newItemInput" placeholder="New item"
           onkeypress="if(event.key === 'Enter') addItem(); " onblur="addItem()">
+          </div>
+          <div class="col">
+            <input type="file" id="imageInput" accept="image/*">
+            <button type="button" onclick="uploadImage()">Upload Image</button>
+          </div>
       </div>
 
 
@@ -56,180 +62,250 @@
 
           </div>
 
+          <div id="images-container">
+            <h5>Images</h5>
+
+          </div>
+
 
 
         </div>
       </div>
 
-
-
-
-
     </div>
 
 
-    <script>
 
-      let itemCount = 1;
-      function addItem() {
-        itemCount++;
-        const container = document.getElementById('checkbox-container');
-        const newItemInput = document.getElementById('newItemInput');
-        const itemText = newItemInput.value;
+  </div>
 
-        if (!itemText.trim()) return;
 
-        fetch('http://localhost:5058/shoppingitem', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            Name: itemText,
-            isComplete: false
-          })
+  <script>
+
+    let itemCount = 1;
+    function addItem() {
+      itemCount++;
+      const container = document.getElementById('checkbox-container');
+      const newItemInput = document.getElementById('newItemInput');
+      const itemText = newItemInput.value;
+
+      if (!itemText.trim()) return;
+
+      fetch('http://localhost:5058/shoppingitem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          Name: itemText,
+          isComplete: false
         })
-          .then(response => response.json())
-          .then(data => {
-            console.log('Success:', data);
-            newItemInput.value = '';
-          })
-          .catch((error) => {
-            console.error('Error:', error);
-          });
-      }
-
-
-
-      function loadItems() {
-
-        fetch('http://localhost:5058/shoppingitems', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
+      })
+        .then(response => response.json())
+        .then(data => {
+          console.log('Success:', data);
+          newItemInput.value = '';
         })
-          .then(response => response.json())
-          .then(items => {
-
-
-            if (!Array.isArray(items)) {
-              throw new Error('Expected an array of items');
-            }
-            items.forEach(item => {
-              console.log("Item:", item);
-              if (item.isComplete) {
-                console.log("Item is complete:", item);
-                addItemToCheckMarked(item);
-              }
-              else {
-                shoppingList.addItemToForm(item);
-              }
-
-            });
-          })
-          .catch((error) => {
-            console.error('Error:', error);
-          });
-      }
-      document.addEventListener('DOMContentLoaded', function () {
-        console.log("DOM fully loaded and parsed");
-        loadItems();
-      });
-
-
-      // function removeItem() {
-      //   var list = document.querySelectorAll('#checkbox-container input:checked');
-      //   list.forEach(function (chk) {
-      //     chk.parentNode.remove();
-      //   });
-      // };
-
-
-      function updateItem(itemId) {
-        console.log("Item updated:", itemId);
-
-
-        let isComplete = document.getElementById(`item${itemId}`).checked;
-        let newItem = JSON.stringify({
-          id: itemId,
-          name: document.querySelector(`label[for="item${itemId}"]`).textContent,
-          isComplete: isComplete
+        .catch((error) => {
+          console.error('Error:', error);
         });
-        console.log("Is complete:", isComplete);
+    }
 
-        fetch(`http://localhost:5058/shoppingitem/${itemId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: newItem
-        })
-          .then(response => response.json()
-          ).then(data => {
-            console.log('Success:', data);
 
+    function uploadImage() {
+      const fileInput = document.getElementById('imageInput');
+      const file = fileInput.files[0];
+      
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        // e.target.result is "data:image/png;base64,iVBORw0KGgo..."
+        const base64Full = e.target.result;
+        const base64Data = base64Full.split(',')[1]; // Just the base64 part
+        const contentType = file.type; // "image/png", "image/jpeg", etc.
+        fetch('http://localhost:5058/imageupload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            Base64Image: base64Data,
+            ContentType: contentType
           })
-          .catch((error) => {
-            console.error('Error:', error);
-          });
-
-
+        })
+        .then(res => res.json())
+        .then(data => console.log('Uploaded:', data))
+        .catch(err => console.error('Error:', err));
       };
+      
+      reader.readAsDataURL(file);
+    }
 
-      function addPostShoppingItem(item) {
-        console.log("New item created:", item);
+    function loadItems() {
 
-        const container = document.getElementById('checkbox-container');
-        const newItem = document.createElement('div');
-        newItem.className = 'form-check';
-        newItem.innerHTML = `
+      fetch('http://localhost:5058/shoppingitems', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+        .then(response => response.json())
+        .then(items => {
+
+
+          if (!Array.isArray(items)) {
+            throw new Error('Expected an array of items');
+          }
+          items.forEach(item => {
+            console.log("Item:", item);
+            if (item.isComplete) {
+              console.log("Item is complete:", item);
+              addItemToCheckMarked(item);
+            }
+            else {
+              shoppingList.addItemToForm(item);
+            }
+
+          });
+        })
+        .catch((error) => {
+          console.error('Error:', error);
+        });
+    }
+
+    function loadImages() {
+      fetch('http://localhost:5058/images', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+        .then(response => response.json())
+        .then(images => {
+          console.log("Images:", images);
+          images.forEach(image => {
+            console.log("Image:", image);
+            addImageToForm(image);
+          });
+        })
+        .catch((error) => {
+          console.error('Error:', error);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      console.log("DOM fully loaded and parsed");
+      loadItems();
+      //loadImages();
+    });
+
+
+    // function removeItem() {
+    //   var list = document.querySelectorAll('#checkbox-container input:checked');
+    //   list.forEach(function (chk) {
+    //     chk.parentNode.remove();
+    //   });
+    // };
+
+
+    function updateItem(itemId) {
+      console.log("Item updated:", itemId);
+
+
+      let isComplete = document.getElementById(`item${itemId}`).checked;
+      let newItem = JSON.stringify({
+        id: itemId,
+        name: document.querySelector(`label[for="item${itemId}"]`).textContent,
+        isComplete: isComplete
+      });
+      console.log("Is complete:", isComplete);
+
+      fetch(`http://localhost:5058/shoppingitem/${itemId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: newItem
+      })
+        .then(response => response.json()
+        ).then(data => {
+          console.log('Success:', data);
+
+        })
+        .catch((error) => {
+          console.error('Error:', error);
+        });
+
+
+    };
+
+    function addPostShoppingItem(item) {
+      console.log("New item created:", item);
+
+      const container = document.getElementById('checkbox-container');
+      const newItem = document.createElement('div');
+      newItem.className = 'form-check';
+      newItem.innerHTML = `
         <input type="checkbox" class="form-check-input" id="item${item.id}" onchange="updateItem(${item.id})">
         <label class="form-check-label" for="item${item.id}">${item.name}</label>
     `;
-        container.appendChild(newItem);
-      }
+      container.appendChild(newItem);
+    }
 
-      function addItemToCheckMarked(item) {
+    function addItemToCheckMarked(item) {
 
-        let checkedContainer = document.getElementById('checked-items-container');
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'checked-item';
-        itemDiv.textContent = item.name;
-        checkedContainer.appendChild(itemDiv);
-      };
+      let checkedContainer = document.getElementById('checked-items-container');
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'checked-item';
+      itemDiv.textContent = item.name;
+      checkedContainer.appendChild(itemDiv);
+    };
 
 
-      // Connections 
-      window.addEventListener('load', () => {
-        const connection = new signalR.HubConnectionBuilder()
-          .withUrl("http://localhost:5058/itemhub")
-          .build();
+    function addImageToForm(data) {
+      console.log("Image received:", data);
+      const container = document.getElementById('images-container');
+      const imgDiv = document.createElement('div');
+      imgDiv.className = 'image-item';
+      const img = document.createElement('img');
+      // data.imageBinary is already base64, data.contentType is e.g. "image/png"
+      img.src = `data:${data.contentType};base64,${data.imageBinary}`;
+      img.style.maxWidth = '200px';
+      imgDiv.appendChild(img);
+      container.appendChild(imgDiv);
+    }
 
-        connection.start().then(() => {
-          connection.on("ItemCreated", (item) => {
-            console.log("Item created via SignalR:", item);
-            shoppingList.addItemToForm(item);
-          });
-          connection.on("ItemUpdated", (item) => {
-            console.log("Item updated via SignalR:", item);
+    window.addEventListener('load', () => {
+      const connection = new signalR.HubConnectionBuilder()
+        .withUrl("http://localhost:5058/itemhub")
+        .configureLogging(signalR.LogLevel.Trace)
+        .build();
 
-            if (item.isComplete) {
-              const checkboxDiv = document.getElementById(`item${item.id}`)?.parentNode;
-              if (checkboxDiv) {
-                //checkboxDiv.remove();
-              }
-              addItemToCheckMarked(item);
-
-            }
-          });
-
+      connection.start().then(() => {
+        connection.on("ItemCreated", (item) => {
+          console.log("Item created via SignalR:", item);
+          shoppingList.addItemToForm(item);
         });
+        connection.on("ItemUpdated", (item) => {
+          console.log("Item updated via SignalR:", item);
+
+          if (item.isComplete) {
+            const checkboxDiv = document.getElementById(`item${item.id}`)?.parentNode;
+            if (checkboxDiv) {
+              //checkboxDiv.remove();
+            }
+            addItemToCheckMarked(item);
+
+          }
+        });
+        connection.on("ImageSent", (data) => {
+          console.log("Image received via SignalR:", data);
+          addImageToForm(data);
+        });
+
       });
+    });
 
 
 
-    </script>
+  </script>
 
 
 

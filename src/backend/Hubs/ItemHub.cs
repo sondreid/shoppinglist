@@ -31,5 +31,7 @@ namespace handleliste.Hubs
         {
             await Clients.All.SendAsync("ItemDeleted", id);
         }
+
+
     }
 }

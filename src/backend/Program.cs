@@ -1,13 +1,15 @@
+using handleliste;
 using handleliste.Hubs;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Microsoft.EntityFrameworkCore;
 
 
-const string allow_origins = "frontend_ports";
+
+
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ShoppingItemDB>(opt => opt.UseInMemoryDatabase("ShoppingList"));
@@ -18,9 +20,9 @@ builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Shoppingliste API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo{ Title = "Shoppingliste API", Version = "v1" });
 });
-
+string allow_origins = "frontend_ports";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: allow_origins,
@@ -64,6 +66,33 @@ app.MapPost("/exampleitem", async (ShoppingItemDB db) =>
     db.ShoppingItems.Add(exampleItem);
     await db.SaveChangesAsync();
     return Results.Created($"/shoppingitems/{exampleItem.Id}", exampleItem);
+});
+
+
+
+app.MapPost("/imageupload", async (ImageRequest request, IHubContext<ItemHub> hubContext) =>
+{
+    if (string.IsNullOrEmpty(request.Base64Image) || string.IsNullOrEmpty(request.ContentType))
+    {
+        return Results.BadRequest("Missing base64Image or contentType");
+    }
+      
+    var imageBinary = Convert.FromBase64String(request.Base64Image);
+    if (imageBinary.Length == 0)
+    {
+        return Results.BadRequest("Invalid image data");
+    }
+      
+    var image = new ImageMessage 
+    { 
+        FileName = "uploaded_image",  // Or derive from contentType, e.g., $"image.{request.ContentType.Split('/')[1]}"
+        ContentType = request.ContentType, 
+        ImageBinary = imageBinary 
+    };
+
+    Console.WriteLine($"Image received: {image.ContentType}");
+    await hubContext.Clients.All.SendAsync("ImageSent", image);
+    return Results.Json(new { success = true, message = "Image stored successfully" });
 });
 
 

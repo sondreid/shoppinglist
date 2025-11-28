@@ -1,15 +1,8 @@
-FROM node:18-alpine
-
-
-COPY . .
-
-RUN npm install
-
-RUN npm run build
-
-
-# Replace dev redirects
-
-EXPOSE 4000
-
-ENTRYPOINT ["npm", "run", "serve"]
+  FROM node:18-alpine AS build
+  WORKDIR /app
+  COPY . .
+  RUN npm install && npm run build
+  FROM joseluisq/static-web-server:2
+  COPY --from=build /app/dist /public
+  ENV SERVER_PORT=4000
+  EXPOSE 4000
