@@ -1,12 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using handleliste;
+using handleliste.Models;
 
-class ShoppingItemDB : DbContext
+public class ShoppingItemDB : DbContext
 {
     public ShoppingItemDB(DbContextOptions<ShoppingItemDB> options)
         : base(options) { }
 
     public DbSet<ShoppingItem> ShoppingItems => Set<ShoppingItem>();
+    public DbSet<Session> Sessions => Set<Session>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -7,3 +7,6 @@ docker-deployment
 .cursor
 *.db*
 *.DS*
+*allowed_users.json
+client_secret.json
+docker-compose.prod.yml

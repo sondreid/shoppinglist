@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+
+</html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="description" content="Shopping List">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="css/vendor.min.css">
+  <link rel="stylesheet" href="css/app.css">
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script type="text/javascript" src="js/vendor.min.js"></script>
+  <script type="text/javascript" src="js/app.js"></script>
+  <script type="text/javascript" src="js/auth.js"></script>
+  <script src="https://unpkg.com/@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
+  <!-- GLightbox for image viewing -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css" />
+  <script src="https://cdn.jsdelivr.net/gh/mcstudios/glightbox/dist/js/glightbox.min.js"></script>
+</head>
+
+
+<body>
+  <div class="container">
+
+
+    <div class="header-row">
+      <div id="auth-container"></div>
+    </div>
+  
+    <h1 style="text-align: center;">Shoppinglist</h1>
+    
+
+    <div class="list-container">
+
+      <div class="input-row">
+        <input type="text" class="form-control" id="newItemInput" placeholder="New item"
+          onkeypress="if(event.key === 'Enter') addItem();">
+        <div class="input-actions">
+          <label class="file-upload-btn btn btn-default" for="imageInput">
+            <span>📷</span>
+            <input type="file" id="imageInput" accept="image/*" style="display: none;">
+          </label>
+          <button type="button" class="btn btn-primary" onclick="addItem()">Add</button>
+        </div>
+      </div>
+
+      <div id="checkbox-container">
+      </div>
+
+      <div id="checked-items-container">
+        <h5>Completed Items</h5>
+      </div>
+
+    </div>
+
+
+
+
+
+    </div>
+
+
+    <script>
+
+      // Initialize GLightbox
+      let lightbox;
+      document.addEventListener('DOMContentLoaded', () => {
+        lightbox = GLightbox({ selector: '.glightbox' });
+      });
+
+      function refreshLightbox() {
+        if (lightbox) lightbox.destroy();
+        lightbox = GLightbox({ selector: '.glightbox' });
+      }
+
+      function getImageDataUrl(item) {
+        if (!item.isImage || !item.image) return null;
+        return `data:${item.image.contentType};base64,${item.image.imageBinary}`;
+      }
+
+      let itemCount = 1;
+
+      function addItem() {
+        const newItemInput = document.getElementById('newItemInput');
+        const fileInput = document.getElementById('imageInput');
+        const itemText = newItemInput.value.trim();
+        const file = fileInput.files[0];
+
+        // Need at least text or image
+        if (!itemText && !file) return;
+
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const base64Full = e.target.result;
+            const base64Data = base64Full.split(',')[1];
+            const contentType = file.type;
+
+            sendItem({
+              Name: itemText || null,
+              IsComplete: false,
+              IsImage: true,
+              Image: {
+                FileName: file.name,
+                ContentType: contentType,
+                ImageBinary: base64Data
+              }
+            });
+          };
+          reader.readAsDataURL(file);
+        } else {
+          sendItem({
+            Name: itemText,
+            IsComplete: false,
+            IsImage: false,
+            Image: null
+          });
+        }
+      }
+
+      function sendItem(item) {
+        fetch(`${auth.getApiBase()}/shoppingitem`, {
+          method: 'POST',
+          headers: auth.getAuthHeaders(),
+          body: JSON.stringify(item)
+        })
+          .then(response => response.json())
+          .then(data => {
+            console.log('Success:', data);
+            document.getElementById('newItemInput').value = '';
+            document.getElementById('imageInput').value = '';
+          })
+          .catch((error) => {
+            console.error('Error:', error);
+          });
+      }
+
+
+
+      function loadItems() {
+
+        fetch(`${auth.getApiBase()}/shoppingitems`, {
+          method: 'GET',
+          headers: auth.getAuthHeaders()
+        })
+          .then(response => response.json())
+          .then(items => {
+
+
+            if (!Array.isArray(items)) {
+              throw new Error('Expected an array of items');
+            }
+            items.forEach(item => {
+              console.log("Item:", item);
+              if (item.isComplete) {
+                console.log("Item is complete:", item);
+                addItemToCheckMarked(item);
+              }
+              else {
+                shoppingList.addItemToForm(item);
+              }
+
+            });
+            refreshLightbox();
+          })
+          .catch((error) => {
+            console.error('Error:', error);
+          });
+      }
+      document.addEventListener('DOMContentLoaded', function () {
+        console.log("DOM fully loaded and parsed");
+        auth.init().then(() => {
+          if (!auth.isAuthenticated) {
+            window.location.href = 'index.html';
+            return;
+          }
+          loadItems();
+          initializeSignalR();
+        });
+      });
+
+
+
+
+      function updateItem(itemId) {
+        console.log("Item updated:", itemId);
+
+
+        let isComplete = document.getElementById(`item${itemId}`).checked;
+        let newItem = JSON.stringify({
+          id: itemId,
+          name: document.querySelector(`label[for="item${itemId}"]`)?.textContent || null,
+          isComplete: isComplete
+        });
+        console.log("Is complete:", isComplete);
+
+        fetch(`${auth.getApiBase()}/shoppingitem/${itemId}`, {
+          method: 'PUT',
+          headers: auth.getAuthHeaders(),
+          body: newItem
+        })
+          .then(response => response.json())
+          .then(data => {
+            console.log('Success:', data);
+            if (isComplete) {
+              const checkboxDiv = document.getElementById(`item${itemId}`)?.parentNode;
+              const itemName = document.querySelector(`label[for="item${itemId}"]`)?.textContent || null;
+              const imgEl = checkboxDiv?.querySelector('img');
+              const itemData = { id: itemId, name: itemName };
+              if (imgEl) {
+                const src = imgEl.src;
+                const contentType = src.split(';')[0].split(':')[1];
+                const base64 = src.split(',')[1];
+                itemData.isImage = true;
+                itemData.image = { contentType, imageBinary: base64 };
+              }
+              if (checkboxDiv) checkboxDiv.remove();
+              addItemToCheckMarked(itemData);
+            }
+          })
+          .catch((error) => {
+            console.error('Error:', error);
+          });
+
+
+      };
+
+      function addItemToCheckMarked(item) {
+        let checkedContainer = document.getElementById('checked-items-container');
+
+        if (document.getElementById(`completed-item${item.id}`)) {
+          return;
+        }
+
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'checked-item d-flex align-items-center gap-2 mb-2';
+        itemDiv.id = `completed-item${item.id}`;
+
+        let content = `
+          <input type="checkbox" class="form-check-input completed-checkbox" checked
+            id="completed-cb${item.id}" onchange="uncompleteItem(${item.id}, this)">
+        `;
+
+        if (item.isImage && item.image) {
+          const dataUrl = getImageDataUrl(item);
+          content += `
+            <a href="${dataUrl}" class="glightbox" data-gallery="completed">
+              <img src="${dataUrl}" alt="${item.name || 'Image'}" style="max-width: 40px; max-height: 40px; cursor: pointer; opacity: 0.6;">
+            </a>
+          `;
+        }
+
+        if (item.name) {
+          content += `<span style="text-decoration: line-through;">${item.name}</span>`;
+        }
+
+        itemDiv.innerHTML = content;
+        // Insert at the top (after the h5 heading) so last-completed appears first
+        const heading = checkedContainer.querySelector('h5');
+        if (heading && heading.nextSibling) {
+          checkedContainer.insertBefore(itemDiv, heading.nextSibling);
+        } else {
+          checkedContainer.appendChild(itemDiv);
+        }
+        refreshLightbox();
+      }
+
+      function uncompleteItem(itemId, checkbox) {
+        const completedDiv = document.getElementById(`completed-item${itemId}`);
+        const itemName = completedDiv?.querySelector('span')?.textContent || null;
+
+        fetch(`${auth.getApiBase()}/shoppingitem/${itemId}`, {
+          method: 'PUT',
+          headers: auth.getAuthHeaders(),
+          body: JSON.stringify({ id: itemId, name: itemName, isComplete: false })
+        })
+          .then(response => response.json())
+          .then(data => {
+            console.log('Uncompleted:', data);
+            if (completedDiv) completedDiv.remove();
+            shoppingList.addItemToForm({ id: itemId, name: itemName });
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            if (checkbox) checkbox.checked = true;
+          });
+      }
+
+      function initializeSignalR() {
+        const hubUrl = window.location.port === '4000' ? 'http://localhost:5058/itemhub' : '/itemhub';
+        const connectionOptions = {};
+        
+        if (auth.isAuthenticated && auth.token) {
+          connectionOptions.accessTokenFactory = () => auth.token;
+        }
+        
+        const connection = new signalR.HubConnectionBuilder()
+          .withUrl(hubUrl, connectionOptions)
+          .build();
+
+        connection.start().then(() => {
+          connection.on("ItemCreated", (item) => {
+            console.log("Item created via SignalR:", item);
+            shoppingList.addItemToForm(item);
+          });
+          connection.on("ItemUpdated", (item) => {
+            console.log("Item updated via SignalR:", item);
+
+            if (item.isComplete) {
+              const checkboxDiv = document.getElementById(`item${item.id}`)?.parentNode;
+              if (checkboxDiv) {
+                checkboxDiv.remove();
+              }
+              addItemToCheckMarked(item);
+            } else {
+              const completedDiv = document.getElementById(`completed-item${item.id}`);
+              if (completedDiv) {
+                completedDiv.remove();
+              }
+              if (!document.getElementById(`item${item.id}`)) {
+                shoppingList.addItemToForm(item);
+              }
+            }
+          });
+        }).catch(err => {
+          console.error("SignalR connection error:", err);
+        });
+      }
+
+
+
+
+    </script>
+
+
+
+
+
+
+</body>
+
+</html>

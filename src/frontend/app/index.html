@@ -5,343 +5,37 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="description" content="Data Display">
+  <meta name="description" content="Handleliste - Shopping List">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="css/vendor.min.css">
   <link rel="stylesheet" href="css/app.css">
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script type="text/javascript" src="js/vendor.min.js"></script>
-  <script type="text/javascript" src="js/app.js"></script>
-  <script src="https://unpkg.com/@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
-  <!-- GLightbox for image viewing -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css" />
-  <script src="https://cdn.jsdelivr.net/gh/mcstudios/glightbox/dist/js/glightbox.min.js"></script>
+  <script type="text/javascript" src="js/auth.js"></script>
 </head>
 
 
 <body>
   <div class="container">
-
-
-    <div class="row">
-      <div class="col">
-        <h1>Handleliste</h1>
-      </div>
-      <div class="col">
-        <h5><i>1.0 </i></h1>
+    <div class="row mt-5">
+      <div class="col-12 text-center">
+        <h1>Shoppinglist</h1>
       </div>
     </div>
 
-
-
-    <div class="container mt-4">
-
-
-      <div class="row">
-        <div class="col">
-          <input type="text" class="form-control" id="newItemInput" placeholder="New item"
-            onkeypress="if(event.key === 'Enter') addItem();">
-        </div>
-        <div class="col">
-          <input type="file" id="imageInput" accept="image/*">
-        </div>
-        <div class="col">
-          <button type="button" class="btn btn-primary" onclick="addItem()">Add Item</button>
-        </div>
+    <div class="row mt-5">
+      <div class="col-12 d-flex justify-content-center">
+        <div id="auth-container"></div>
       </div>
-
-
-      <div class="row">
-
-
-        <div id="checkbox-container">
-
-        </div>
-
-        <div class="row">
-
-
-          <div id="checked-items-container">
-            <h5>Completed Items</h5>
-
-          </div>
-
-
-
-        </div>
-      </div>
-
     </div>
-
-
-
   </div>
 
-
   <script>
-    // Initialize GLightbox
-    let lightbox;
-    document.addEventListener('DOMContentLoaded', () => {
-      lightbox = GLightbox({ selector: '.glightbox' });
-    });
-
-    // Refresh lightbox when new images are added
-    function refreshLightbox() {
-      if (lightbox) lightbox.destroy();
-      lightbox = GLightbox({ selector: '.glightbox' });
-    }
-
-    let itemCount = 1;
-    
-    function addItem() {
-      const newItemInput = document.getElementById('newItemInput');
-      const fileInput = document.getElementById('imageInput');
-      const itemText = newItemInput.value.trim();
-      const file = fileInput.files[0];
-
-      // Need at least text or image
-      if (!itemText && !file) return;
-
-      if (file) {
-        // Has image - read and send with optional text
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const base64Full = e.target.result;
-          const base64Data = base64Full.split(',')[1];
-          const contentType = file.type;
-          
-          sendItem({
-            Name: itemText || null,
-            IsComplete: false,
-            IsImage: true,
-            Image: {
-              FileName: file.name,
-              ContentType: contentType,
-              ImageBinary: base64Data
-            }
-          });
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // Text only
-        sendItem({
-          Name: itemText,
-          IsComplete: false,
-          IsImage: false,
-          Image: null
-        });
-      }
-    }
-
-    function sendItem(item) {
-      fetch('http://localhost:5058/shoppingitem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(item)
-      })
-      .then(response => response.json())
-      .then(data => {
-        console.log('Success:', data);
-        document.getElementById('newItemInput').value = '';
-        document.getElementById('imageInput').value = '';
-      })
-      .catch(error => console.error('Error:', error));
-    }
-
-    function loadItems() {
-
-      fetch('http://localhost:5058/shoppingitems', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-        .then(response => response.json())
-        .then(items => {
-
-
-          if (!Array.isArray(items)) {
-            throw new Error('Expected an array of items');
-          }
-          items.forEach(item => {
-            console.log("Item:", item);
-            console.log("Item.image:", item.image);
-            if (item.isComplete) {
-              console.log("Item is complete:", item);
-              addItemToCheckMarked(item);
-            }
-            else {
-              shoppingList.addItemToForm(item);
-            }
-          });
-          refreshLightbox();
-        })
-        .catch((error) => {
-          console.error('Error:', error);
-        });
-    }
-
-    function loadImages() {
-      fetch('http://localhost:5058/images', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
-        .then(response => response.json())
-        .then(images => {
-          console.log("Images:", images);
-          images.forEach(image => {
-            console.log("Image:", image);
-            addImageToForm(image);
-          });
-        })
-        .catch((error) => {
-          console.error('Error:', error);
-        });
-    }
-
     document.addEventListener('DOMContentLoaded', function () {
-      console.log("DOM fully loaded and parsed");
-      loadItems();
-      //loadImages();
+      auth.init();
     });
-
-
-    // function removeItem() {
-    //   var list = document.querySelectorAll('#checkbox-container input:checked');
-    //   list.forEach(function (chk) {
-    //     chk.parentNode.remove();
-    //   });
-    // };
-
-
-    function updateItem(itemId) {
-      console.log("Item updated:", itemId);
-
-      let isComplete = document.getElementById(`item${itemId}`).checked;
-      let label = document.querySelector(`label[for="item${itemId}"]`);
-      let newItem = JSON.stringify({
-        id: itemId,
-        name: label ? label.textContent : null,
-        isComplete: isComplete
-      });
-      console.log("Is complete:", isComplete);
-
-      fetch(`http://localhost:5058/shoppingitem/${itemId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: newItem
-      })
-        .then(response => response.json())
-        .then(data => {
-          console.log('Success:', data);
-        })
-        .catch((error) => {
-          console.error('Error:', error);
-        });
-    };
-
-    function getImageDataUrl(item) {
-      if (!item.isImage || !item.image) return null;
-      return `data:${item.image.contentType};base64,${item.image.imageBinary}`;
-    }
-
-    function addPostShoppingItem(item) {
-      console.log("New item created:", item);
-
-      const container = document.getElementById('checkbox-container');
-      const newItem = document.createElement('div');
-      newItem.className = 'form-check d-flex align-items-center gap-2';
-      
-      let content = `
-        <input type="checkbox" class="form-check-input" id="item${item.id}" onchange="updateItem(${item.id})">
-      `;
-      
-      if (item.isImage && item.image) {
-        const dataUrl = getImageDataUrl(item);
-        content += `
-          <a href="${dataUrl}" class="glightbox" data-gallery="gallery1">
-            <img src="${dataUrl}" alt="${item.name || 'Image'}" style="max-width: 60px; max-height: 60px; cursor: pointer;">
-          </a>
-        `;
-      }
-      
-      if (item.name) {
-        content += `<label class="form-check-label" for="item${item.id}">${item.name}</label>`;
-      }
-      
-      newItem.innerHTML = content;
-      container.appendChild(newItem);
-      refreshLightbox();
-    }
-
-    function addItemToCheckMarked(item) {
-      let checkedContainer = document.getElementById('checked-items-container');
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'checked-item d-flex align-items-center gap-2 mb-2';
-      
-      let content = '';
-      
-      if (item.isImage && item.image) {
-        const dataUrl = getImageDataUrl(item);
-        content += `
-          <a href="${dataUrl}" class="glightbox" data-gallery="completed">
-            <img src="${dataUrl}" alt="${item.name || 'Image'}" style="max-width: 40px; max-height: 40px; cursor: pointer; opacity: 0.6;">
-          </a>
-        `;
-      }
-      
-      if (item.name) {
-        content += `<span style="text-decoration: line-through;">${item.name}</span>`;
-      }
-      
-      itemDiv.innerHTML = content;
-      checkedContainer.appendChild(itemDiv);
-      refreshLightbox();
-    }
-
-    window.addEventListener('load', () => {
-      const connection = new signalR.HubConnectionBuilder()
-        .withUrl("http://localhost:5058/itemhub")
-        .configureLogging(signalR.LogLevel.Trace)
-        .build();
-
-      connection.start().then(() => {
-        connection.on("ItemCreated", (item) => {
-          console.log("Item created via SignalR:", item);
-          if (item.isComplete) {
-            addItemToCheckMarked(item);
-          } else {
-            addPostShoppingItem(item);
-          }
-        });
-        connection.on("ItemUpdated", (item) => {
-          console.log("Item updated via SignalR:", item);
-
-          if (item.isComplete) {
-            const checkboxDiv = document.getElementById(`item${item.id}`)?.parentNode;
-            if (checkboxDiv) {
-              checkboxDiv.remove();
-            }
-            addItemToCheckMarked(item);
-          }
-        });
-      });
-    });
-
-
-
   </script>
-
-
-
-
-
-
 
 </body>
 

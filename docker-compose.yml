@@ -1,33 +1,74 @@
-version: '3.9'
-
 services:
+  nginx-proxy:
+    restart: always
+    image: jwilder/nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - nginx-certs:/etc/nginx/certs
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+      - "/var/run/docker.sock:/tmp/docker.sock:ro"
+    networks:
+      - proxy_net
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+    environment:
+      - client_max_body_size=0
+      - TZ=${TZ}
+
+  letsencrypt:
+    restart: always
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - nginx-certs:/etc/nginx/certs
+      - nginx-vhost:/etc/nginx/vhost.d
+      - nginx-html:/usr/share/nginx/html
+      - "/var/run/docker.sock:/tmp/docker.sock:ro"
+    depends_on:
+      - nginx-proxy
+    networks:
+      - proxy_net
   api:
     build:
-      context: ./src/backend
-      dockerfile: Dockerfile
-    ports:
-      - 5058:5058
-
+      context: "https://oauth2:${GITHUB_PAT}@github.com/${GITHUB_REPO}.git#master:src/backend"
     environment:
-     - dev=false
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - TZ=${TZ}
+    volumes:
+      - ./allowed_users.json:/app/allowed_users.json:ro
+      - shoppinglist-data:/app/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://api:5058/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5058/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - internal
 
   webapp:
     build:
-      context: ./src/frontend
-      dockerfile: Dockerfile
+      context: "https://oauth2:${GITHUB_PAT}@github.com/${GITHUB_REPO}.git#master:src/frontend"
     environment:
-      API_URL: api
-    ports:
-      - 4000:4000
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+      - TZ=${TZ}
     depends_on:
       - api
-    links: 
-      - api
+    networks:
+      - internal
+      - proxy_net
+
+volumes:
+  shoppinglist-data:
+  nginx-certs:
+  nginx-vhost:
+  nginx-html:
 
 networks:
-  handlelistenet:
+  internal:
+  proxy_net:
+    driver: bridge

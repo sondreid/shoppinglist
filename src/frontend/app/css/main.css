@@ -1,3 +1,139 @@
 body {
     color: blue;
 }
+
+/* Header */
+.header-row {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0.5rem 0;
+}
+
+.header-row h1 {
+    margin: 0;
+    font-size: 1.75rem;
+    text-align: center;
+}
+
+#auth-container {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+}
+
+#auth-container .d-flex {
+    gap: 0.5rem;
+}
+
+#google-signin-button {
+    display: inline-block;
+}
+
+/* Input area */
+.input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.input-row .form-control {
+    flex: 1;
+}
+
+.input-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.file-upload-btn {
+    cursor: pointer;
+    margin: 0;
+    padding: 6px 10px;
+}
+
+/* List container */
+.list-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 0 0.5rem;
+}
+
+/* Checkbox items */
+.form-check {
+    padding: 0.5rem 0;
+    display: flex;
+    align-items: center;
+}
+
+.form-check-input {
+    margin-right: 0.75rem;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.form-check-label {
+    font-size: 1.1rem;
+}
+
+/* Completed items */
+.completed-checkbox {
+    accent-color: gray;
+    opacity: 0.6;
+    cursor: pointer;
+}
+
+.checked-item {
+    padding: 0.35rem 0;
+}
+
+#checked-items-container h5 {
+    margin-top: 1.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid #eee;
+}
+
+/* Utility classes (Bootstrap 3 lacks these) */
+.d-flex {
+    display: flex;
+}
+
+.gap-2 {
+    gap: 0.5rem;
+}
+
+.mb-2 {
+    margin-bottom: 0.5rem;
+}
+
+.me-2 {
+    margin-right: 0.5rem;
+}
+
+.justify-content-center {
+    justify-content: center;
+}
+
+.justify-content-end {
+    justify-content: flex-end;
+}
+
+.align-items-center {
+    align-items: center;
+}
+
+.mt-5 {
+    margin-top: 3rem;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.lead {
+    font-size: 1.25rem;
+    font-weight: 300;
+}
