@@ -64,6 +64,7 @@ public class GoogleAuthMiddleware
         return path == "/health" ||
                path == "/config" ||
                path == "/auth/google" ||
+               path == "/auth/dev-login" ||
                path?.StartsWith("/swagger") == true ||
                path?.StartsWith("/itemhub") == true;
     }

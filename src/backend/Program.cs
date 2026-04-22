@@ -14,6 +14,15 @@ using DotNetEnv;
 
 Env.Load();
 
+var ssoOverride = string.Equals(
+    Environment.GetEnvironmentVariable("SSO_OVERRIDE"),
+    "true", StringComparison.OrdinalIgnoreCase);
+
+var devMode = string.Equals(
+    Environment.GetEnvironmentVariable("DEV_MODE"),
+    "true", StringComparison.OrdinalIgnoreCase);
+
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ShoppingItemDB>(opt => opt.UseSqlite("Data Source=data/shoppinglist.db"));
 
@@ -24,6 +33,29 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo{ Title = "Shoppingliste API", Version = "v1" });
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "opaque",
+        In = ParameterLocation.Header,
+        Description = "Paste the sessionToken from POST /auth/dev-login (or /auth/google)."
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
 });
 
 builder.Services.AddSingleton<GoogleAuthService>();
@@ -35,7 +67,7 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy.WithOrigins("http://localhost:4000", "http://localhost:4001", "http://frontend:4000",
-                    "http://localhost:3000")
+                    "http://localhost:3000", "http://localhost:5058")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
@@ -44,6 +76,16 @@ builder.Services.AddCors(options =>
 
 
 var app = builder.Build();
+
+if (ssoOverride && !devMode)
+{
+    app.Logger.LogCritical("SSO_OVERRIDE=true requires DEV_MODE=true. Exiting.");
+    Environment.Exit(1);
+}
+if (ssoOverride)
+{
+    app.Logger.LogWarning("SSO_OVERRIDE=true — authentication bypassed. DEV ONLY.");
+}
 
 
 using (var scope = app.Services.CreateScope())
@@ -117,6 +159,25 @@ app.MapPost("/auth/google", async (AuthRequest request, GoogleAuthService authSe
 
     return Results.Json(new AuthResponse { User = user, SessionToken = sessionToken });
 });
+
+if (ssoOverride)
+{
+    app.MapPost("/auth/dev-login", async (ShoppingItemDB db) =>
+    {
+        var sessionToken = Convert.ToHexString(
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+        var user = new UserInfo { Email = "dev@local", Name = "Dev User" };
+        db.Sessions.Add(new handleliste.Models.Session
+        {
+            Token = sessionToken,
+            Email = user.Email,
+            Name = user.Name,
+            ExpiresAt = DateTime.UtcNow.AddDays(1)
+        });
+        await db.SaveChangesAsync();
+        return Results.Json(new AuthResponse { User = user, SessionToken = sessionToken });
+    });
+}
 
 
 app.MapPost("/exampleitem", async (ShoppingItemDB db) =>
@@ -211,5 +272,10 @@ app.Use(async (context, next) =>
 app.MapGet("/health", () => new { payload = "A-okay" });
 
 
-var devMode = Environment.GetEnvironmentVariable("dev_mode")?.ToLower() == "true";
+
+if (devMode)
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(); // Access at /swagger
+}
 app.Run(devMode ? "http://localhost:5058" : "http://0.0.0.0:5058");
