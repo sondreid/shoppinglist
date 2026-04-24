@@ -1,0 +1,12 @@
+services:
+  api:
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile
+    # environment:
+    #   SSO_OVERRIDE: "true"  # dev-only: enables POST /auth/dev-login
+
+  webapp:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile

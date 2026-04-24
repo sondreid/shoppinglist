@@ -160,6 +160,11 @@ const auth = {
     this.initializeGoogleSignIn();
   },
 
+  handleUnauthorized() {
+    console.warn('Session expired or invalid — signing out.');
+    this.signOut();
+  },
+
   getAuthHeaders() {
     if (!this.isAuthenticated || !this.token) {
       return { 'Content-Type': 'application/json' };

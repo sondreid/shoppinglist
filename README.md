@@ -8,3 +8,14 @@ No fancy javascript latest framework or whatever.
 
 
 ![](image.png)
+
+## Development
+
+
+Run npm start and dotnet run in frontend and backend projects respectively. 
+
+### Auth override for local testing
+
+Set `SSO_OVERRIDE=true` on the backend to enable a dev-only login endpoint
+that skips Google OAuth. Requires `DEV_MODE=true` — the backend refuses to
+start with `SSO_OVERRIDE=true` unless dev mode is also enabled. Defaults off.

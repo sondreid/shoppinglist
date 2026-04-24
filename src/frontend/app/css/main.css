@@ -137,3 +137,30 @@ body {
     font-size: 1.25rem;
     font-weight: 300;
 }
+
+/* Offline banner */
+.offline-banner {
+    display: none;
+    background-color: #e67e22;
+    color: #fff;
+    text-align: center;
+    padding: 0.5rem;
+    font-weight: 600;
+}
+
+.offline-banner.visible {
+    display: block;
+}
+
+.offline-banner.flash {
+    animation: flash 1.5s ease-in-out;
+}
+
+@keyframes flash {
+    0%   { opacity: 1; background-color: #e67e22; }
+    20%  { opacity: 0.4; background-color: #d35400; }
+    40%  { opacity: 1; background-color: #e67e22; }
+    60%  { opacity: 0.4; background-color: #d35400; }
+    80%  { opacity: 1; background-color: #e67e22; }
+    100% { opacity: 1; background-color: #e67e22; }
+}

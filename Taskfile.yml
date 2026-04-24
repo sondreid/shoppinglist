@@ -1,0 +1,14 @@
+version: '3'
+
+tasks:
+  dev:
+    desc: Start frontend dev server
+    dir: src/frontend
+    cmds:
+      - npm start
+
+  dev:api:
+    desc: Start backend API dev server
+    dir: src/backend
+    cmds:
+      - dotnet watch run
