@@ -255,6 +255,11 @@ app.MapDelete("/shoppingitem/{id}", async (int id, ShoppingItemDB db) =>
     return Results.Json(new { success = true, message = $"Deleted item  {id}" });
 });
 
+app.MapGet("/auth/whoami", (HttpContext ctx) =>
+{
+    var user = ctx.Items["User"] as UserInfo;
+    return user is null ? Results.Unauthorized() : Results.Json(user);
+});
 
 app.Use(async (context, next) =>
 {

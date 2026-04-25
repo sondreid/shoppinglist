@@ -18,6 +18,10 @@
 
 <body>
   <div class="container">
+    <div id="session-expired-banner" class="alert alert-warning text-center mt-3" style="display:none;">
+      Your session expired. Please sign in again.
+    </div>
+
     <div class="row mt-5">
       <div class="col-12 text-center">
         <h1>Shoppinglist</h1>
@@ -33,6 +37,10 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', function () {
+      if (sessionStorage.getItem('session_expired') === '1') {
+        document.getElementById('session-expired-banner').style.display = 'block';
+        sessionStorage.removeItem('session_expired');
+      }
       auth.init();
     });
   </script>

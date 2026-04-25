@@ -44,11 +44,17 @@ public class GoogleAuthMiddleware
 
         if (session == null)
         {
+            
             context.Response.StatusCode = 401;
             await context.Response.WriteAsJsonAsync(new { error = "Invalid or expired session" });
             return;
         }
-
+        // slide window 
+        if (session.ExpiresAt - DateTime.UtcNow < TimeSpan.FromDays(6))
+        {
+            session.ExpiresAt = DateTime.UtcNow.AddDays(7);
+            await db.SaveChangesAsync();
+        }
         context.Items["User"] = new UserInfo
         {
             Email = session.Email,

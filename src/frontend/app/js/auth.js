@@ -161,6 +161,8 @@ const auth = {
   },
 
   handleUnauthorized() {
+    if (sessionStorage.getItem('session_expired') === '1') return;
+    sessionStorage.setItem('session_expired', '1');
     console.warn('Session expired or invalid — signing out.');
     this.signOut();
   },
