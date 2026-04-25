@@ -3,7 +3,6 @@ const shoppingList = {
 
 
   addItemToForm(item) {
-    console.log("New item created:", item);
 
     if (document.getElementById(`item${item.id}`)) return;
 

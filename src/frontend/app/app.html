@@ -162,9 +162,8 @@
               throw new Error('Expected an array of items');
             }
             items.forEach(item => {
-              console.log("Item:", item);
               if (item.isComplete) {
-                console.log("Item is complete:", item);
+                //console.log("Item is complete:", item);
                 addItemToCheckMarked(item);
               }
               else {
@@ -179,7 +178,6 @@
           });
       }
       document.addEventListener('DOMContentLoaded', function () {
-        console.log("DOM fully loaded and parsed");
         offline.init();
         auth.init().then(() => {
           if (!auth.isAuthenticated) {
@@ -195,7 +193,6 @@
 
 
       function updateItem(itemId) {
-        console.log("Item updated:", itemId);
 
 
         let isComplete = document.getElementById(`item${itemId}`).checked;
@@ -204,7 +201,6 @@
           name: document.querySelector(`label[for="item${itemId}"]`)?.textContent || null,
           isComplete: isComplete
         });
-        console.log("Is complete:", isComplete);
 
         fetch(`${auth.getApiBase()}/shoppingitem/${itemId}`, {
           method: 'PUT',
@@ -216,7 +212,7 @@
             return response.json();
           })
           .then(data => {
-            console.log('Success:', data);
+
             if (isComplete) {
               const checkboxDiv = document.getElementById(`item${itemId}`)?.parentNode;
               const itemName = document.querySelector(`label[for="item${itemId}"]`)?.textContent || null;
