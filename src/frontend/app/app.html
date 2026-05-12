@@ -221,6 +221,39 @@
           });
       }
 
+      function fullResync() {
+        const checkbox = document.getElementById('checkbox-container');
+        if (checkbox) checkbox.replaceChildren();
+        const completed = document.getElementById('checked-items-container');
+        if (completed) {
+          completed.querySelectorAll('.checked-item').forEach(n => n.remove());
+        }
+        completedOffset = 0;
+        updateLoadMoreButton(false);
+        return loadItems();
+      }
+
+      let lastResyncMs = 0;
+      function maybeResync(reason) {
+        const now = Date.now();
+        if (now - lastResyncMs < 1000) return;
+        lastResyncMs = now;
+        console.log('Resync triggered:', reason);
+        const conn = window._hub;
+        if (conn && conn.state === signalR.HubConnectionState.Disconnected) {
+          conn.start().catch(err => console.error('Manual reconnect failed:', err));
+        }
+        fullResync();
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') maybeResync('visibilitychange');
+      });
+
+      window.addEventListener('pageshow', (e) => {
+        if (e.persisted) maybeResync('bfcache-restore');
+      });
+
       function deleteItem(id) {
         if (!confirm('Delete this item permanently?')) return;
         fetch(`${auth.getApiBase()}/shoppingitem/${id}`, {
@@ -370,7 +403,9 @@
         
         const connection = new signalR.HubConnectionBuilder()
           .withUrl(hubUrl, connectionOptions)
+          .withAutomaticReconnect()
           .build();
+        window._hub = connection;
 
         connection.start().then(() => {
           connection.on("ItemCreated", (item) => {
@@ -400,6 +435,10 @@
             console.log("Item deleted via SignalR:", id);
             document.getElementById(`completed-item${id}`)?.remove();
             document.getElementById(`item${id}`)?.parentNode?.remove();
+          });
+          connection.onreconnected(() => {
+            console.log('SignalR reconnected — full resync');
+            fullResync();
           });
         }).catch(err => {
           console.error("SignalR connection error:", err);
