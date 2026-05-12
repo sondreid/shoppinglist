@@ -203,11 +203,26 @@ app.MapPost("/exampleitem", async (ShoppingItemDB db) =>
 
 
 
-app.MapGet("/completedshoppingitems", async (ShoppingItemDB db) =>
-    await db.ShoppingItems.Include(item => item.Image).Where(item => item.IsComplete).ToListAsync());
+app.MapGet("/completedshoppingitems", async (ShoppingItemDB db, int? skip, int? take) =>
+{
+    var s = Math.Max(0, skip ?? 0);
+    var t = Math.Clamp(take ?? 100, 1, 200);
+    var query = db.ShoppingItems.Where(item => item.IsComplete);
+    var total = await query.CountAsync();
+    var items = await query
+        .Include(item => item.Image)
+        .OrderByDescending(item => item.UpdatedAt)
+        .Skip(s)
+        .Take(t)
+        .ToListAsync();
+    return Results.Json(new { items, total, hasMore = s + items.Count < total });
+});
 
 app.MapGet("/uncompletedshoppingitems", async (ShoppingItemDB db) =>
-    await db.ShoppingItems.Include(item => item.Image).Where(item => !item.IsComplete).ToListAsync());
+    await db.ShoppingItems.Include(item => item.Image)
+        .Where(item => !item.IsComplete)
+        .OrderBy(item => item.UpdatedAt)
+        .ToListAsync());
 
 app.MapGet("/shoppingitems", async (ShoppingItemDB db) =>
     await db.ShoppingItems.Include(item => item.Image).OrderBy(item => item.UpdatedAt).ToListAsync());
@@ -245,13 +260,14 @@ app.MapPut("/shoppingitem/{id}",
         return Results.Json(new { success = true, message = $"Updated item  {id}" });
     });
 
-app.MapDelete("/shoppingitem/{id}", async (int id, ShoppingItemDB db) =>
+app.MapDelete("/shoppingitem/{id}", async (int id, ShoppingItemDB db, IHubContext<ItemHub> hubContext) =>
 {
     var item = await db.ShoppingItems.FindAsync(id);
     if (item is null) return Results.NotFound();
 
     db.ShoppingItems.Remove(item);
     await db.SaveChangesAsync();
+    await hubContext.Clients.All.SendAsync("ItemDeleted", id);
     return Results.Json(new { success = true, message = $"Deleted item  {id}" });
 });
 

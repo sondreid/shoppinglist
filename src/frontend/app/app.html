@@ -56,6 +56,11 @@
         <h5>Completed Items</h5>
       </div>
 
+      <button type="button" id="loadMoreCompleted" class="btn btn-default btn-sm"
+              style="display:none; margin-top:0.5rem;" onclick="loadMoreCompleted()">
+        Load more
+      </button>
+
     </div>
 
 
@@ -84,8 +89,46 @@
       }
 
       let itemCount = 1;
+      let completedOffset = 0;
+      const COMPLETED_PAGE_SIZE = 100;
 
-      function addItem() {
+      function handleJson(response) {
+        if (response.status === 401) {
+          auth.handleUnauthorized();
+          return Promise.reject(new Error('Unauthorized'));
+        }
+        return response.json();
+      }
+
+      async function compressImage(file, maxDim = 1024, quality = 0.7) {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const img = await new Promise((resolve, reject) => {
+          const i = new Image();
+          i.onload = () => resolve(i);
+          i.onerror = reject;
+          i.src = dataUrl;
+        });
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const outDataUrl = canvas.toDataURL('image/jpeg', quality);
+        return {
+          contentType: 'image/jpeg',
+          base64: outDataUrl.split(',')[1],
+          fileName: file.name.replace(/\.[^.]+$/, '') + '.jpg'
+        };
+      }
+
+      async function addItem() {
         const newItemInput = document.getElementById('newItemInput');
         const fileInput = document.getElementById('imageInput');
         const itemText = newItemInput.value.trim();
@@ -95,24 +138,17 @@
         if (!itemText && !file) return;
 
         if (file) {
-          const reader = new FileReader();
-          reader.onload = function(e) {
-            const base64Full = e.target.result;
-            const base64Data = base64Full.split(',')[1];
-            const contentType = file.type;
-
-            sendItem({
-              Name: itemText || null,
-              IsComplete: false,
-              IsImage: true,
-              Image: {
-                FileName: file.name,
-                ContentType: contentType,
-                ImageBinary: base64Data
-              }
-            });
-          };
-          reader.readAsDataURL(file);
+          const compressed = await compressImage(file);
+          sendItem({
+            Name: itemText || null,
+            IsComplete: false,
+            IsImage: true,
+            Image: {
+              FileName: compressed.fileName,
+              ContentType: compressed.contentType,
+              ImageBinary: compressed.base64
+            }
+          });
         } else {
           sendItem({
             Name: itemText,
@@ -129,10 +165,7 @@
           headers: auth.getAuthHeaders(),
           body: JSON.stringify(item)
         })
-          .then(response => {
-            if (response.status === 401) { auth.handleUnauthorized(); return Promise.reject(new Error('Unauthorized')); }
-            return response.json();
-          })
+          .then(handleJson)
           .then(data => {
             console.log('Success:', data);
             document.getElementById('newItemInput').value = '';
@@ -143,35 +176,60 @@
           });
       }
 
+      function updateLoadMoreButton(hasMore) {
+        const btn = document.getElementById('loadMoreCompleted');
+        if (btn) btn.style.display = hasMore ? '' : 'none';
+      }
 
-
-      function loadItems() {
-
-        fetch(`${auth.getApiBase()}/shoppingitems`, {
+      function loadMoreCompleted() {
+        fetch(`${auth.getApiBase()}/completedshoppingitems?skip=${completedOffset}&take=${COMPLETED_PAGE_SIZE}`, {
           method: 'GET',
           headers: auth.getAuthHeaders()
         })
-          .then(response => {
-            if (response.status === 401) { auth.handleUnauthorized(); return Promise.reject(new Error('Unauthorized')); }
-            return response.json();
-          })
-          .then(items => {
-
-
-            if (!Array.isArray(items)) {
-              throw new Error('Expected an array of items');
-            }
-            items.forEach(item => {
-              if (item.isComplete) {
-                //console.log("Item is complete:", item);
-                addItemToCheckMarked(item);
-              }
-              else {
-                shoppingList.addItemToForm(item);
-              }
-
-            });
+          .then(handleJson)
+          .then(page => {
+            page.items.forEach(addItemToCheckMarked);
+            completedOffset += page.items.length;
+            updateLoadMoreButton(page.hasMore);
             refreshLightbox();
+          })
+          .catch((error) => {
+            console.error('Error:', error);
+          });
+      }
+
+      function loadItems() {
+        return Promise.all([
+          fetch(`${auth.getApiBase()}/uncompletedshoppingitems`, {
+            method: 'GET',
+            headers: auth.getAuthHeaders()
+          }).then(handleJson),
+          fetch(`${auth.getApiBase()}/completedshoppingitems?skip=0&take=${COMPLETED_PAGE_SIZE}`, {
+            method: 'GET',
+            headers: auth.getAuthHeaders()
+          }).then(handleJson)
+        ])
+          .then(([uncompleted, completedPage]) => {
+            uncompleted.forEach(item => shoppingList.addItemToForm(item));
+            completedPage.items.forEach(addItemToCheckMarked);
+            completedOffset = completedPage.items.length;
+            updateLoadMoreButton(completedPage.hasMore);
+            refreshLightbox();
+          })
+          .catch((error) => {
+            console.error('Error:', error);
+          });
+      }
+
+      function deleteItem(id) {
+        if (!confirm('Delete this item permanently?')) return;
+        fetch(`${auth.getApiBase()}/shoppingitem/${id}`, {
+          method: 'DELETE',
+          headers: auth.getAuthHeaders()
+        })
+          .then(response => {
+            if (response.status === 401) { auth.handleUnauthorized(); return; }
+            document.getElementById(`completed-item${id}`)?.remove();
           })
           .catch((error) => {
             console.error('Error:', error);
@@ -265,6 +323,8 @@
           content += `<span style="text-decoration: line-through;">${item.name}</span>`;
         }
 
+        content += `<button type="button" class="delete-completed" aria-label="Delete" onclick="deleteItem(${item.id})">🗑</button>`;
+
         itemDiv.innerHTML = content;
         // Insert at the top (after the h5 heading) so last-completed appears first
         const heading = checkedContainer.querySelector('h5');
@@ -335,6 +395,11 @@
                 shoppingList.addItemToForm(item);
               }
             }
+          });
+          connection.on("ItemDeleted", (id) => {
+            console.log("Item deleted via SignalR:", id);
+            document.getElementById(`completed-item${id}`)?.remove();
+            document.getElementById(`item${id}`)?.parentNode?.remove();
           });
         }).catch(err => {
           console.error("SignalR connection error:", err);
