@@ -93,16 +93,21 @@ using (var scope = app.Services.CreateScope())
     Directory.CreateDirectory("data");
     var db = scope.ServiceProvider.GetRequiredService<ShoppingItemDB>();
     db.Database.EnsureCreated();
-    // EnsureCreated() never alters an existing database, so add columns
-    // introduced after the first deploy by hand.
-    try
-    {
-        db.Database.ExecuteSqlRaw("ALTER TABLE ShoppingItems ADD COLUMN Quantity INTEGER NOT NULL DEFAULT 1");
-    }
-    catch (Microsoft.Data.Sqlite.SqliteException)
-    {
-        // Column already exists.
-    }
+    // EnsureCreated does nothing when the database already exists, so create newer tables explicitly
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "DinnerPlans" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_DinnerPlans" PRIMARY KEY AUTOINCREMENT,
+            "Date" TEXT NOT NULL,
+            "Recipe" TEXT NULL,
+            "UpdatedAt" TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS "DinnerIngredients" (
+            "Id" INTEGER NOT NULL CONSTRAINT "PK_DinnerIngredients" PRIMARY KEY AUTOINCREMENT,
+            "DinnerPlanId" INTEGER NOT NULL,
+            "ShoppingItemId" INTEGER NOT NULL,
+            "Name" TEXT NULL
+        );
+        """);
 }
 
 app.UseCors(allowOrigins);
@@ -281,6 +286,79 @@ app.MapDelete("/shoppingitem/{id}", async (int id, ShoppingItemDB db, IHubContex
     await db.SaveChangesAsync();
     await hubContext.Clients.All.SendAsync("ItemDeleted", id);
     return Results.Json(new { success = true, message = $"Deleted item  {id}" });
+});
+
+app.MapGet("/dinnerplans", async (ShoppingItemDB db, string from, string to) =>
+{
+    var plans = await db.DinnerPlans
+        .Where(plan => plan.Date.CompareTo(from) >= 0 && plan.Date.CompareTo(to) <= 0)
+        .OrderBy(plan => plan.Date)
+        .ToListAsync();
+    var planIds = plans.Select(plan => plan.Id).ToList();
+    var ingredients = await db.DinnerIngredients
+        .Where(ingredient => planIds.Contains(ingredient.DinnerPlanId))
+        .ToListAsync();
+    return Results.Json(plans.Select(plan => new
+    {
+        plan.Id,
+        plan.Date,
+        plan.Recipe,
+        Ingredients = ingredients.Where(ingredient => ingredient.DinnerPlanId == plan.Id)
+    }));
+});
+
+app.MapPost("/dinnerplan", async (DinnerPlan plan, ShoppingItemDB db) =>
+{
+    if (string.IsNullOrEmpty(plan.Date))
+        return Results.Json(new { success = false, message = "Missing 'date' property in payload." }, statusCode: 400);
+
+    var existing = await db.DinnerPlans.FirstOrDefaultAsync(p => p.Date == plan.Date);
+    if (existing == null)
+    {
+        existing = new DinnerPlan { Date = plan.Date };
+        db.DinnerPlans.Add(existing);
+    }
+    existing.Recipe = plan.Recipe;
+    existing.UpdatedAt = DateTime.UtcNow;
+    await db.SaveChangesAsync();
+    return Results.Json(new { success = true, plan = existing });
+});
+
+app.MapPost("/dinnerplan/{id}/ingredient",
+    async (int id, DinnerIngredient ingredient, ShoppingItemDB db, IHubContext<ItemHub> hubContext) =>
+    {
+        var plan = await db.DinnerPlans.FindAsync(id);
+        if (plan == null) return Results.NotFound();
+        if (string.IsNullOrEmpty(ingredient.Name))
+            return Results.Json(new { success = false, message = "Missing 'name' property in payload." }, statusCode: 400);
+
+        var item = new ShoppingItem { Name = ingredient.Name, IsComplete = false, UpdatedAt = DateTime.UtcNow };
+        db.ShoppingItems.Add(item);
+        await db.SaveChangesAsync();
+
+        ingredient.DinnerPlanId = id;
+        ingredient.ShoppingItemId = item.Id;
+        db.DinnerIngredients.Add(ingredient);
+        await db.SaveChangesAsync();
+
+        await hubContext.Clients.All.SendAsync("ItemCreated", item);
+        return Results.Json(new { success = true, ingredient });
+    });
+
+app.MapDelete("/dinneringredient/{id}", async (int id, ShoppingItemDB db, IHubContext<ItemHub> hubContext) =>
+{
+    var ingredient = await db.DinnerIngredients.FindAsync(id);
+    if (ingredient is null) return Results.NotFound();
+
+    // ExecuteDelete tolerates the row already being gone (e.g. duplicate requests)
+    await db.DinnerIngredients.Where(i => i.Id == id).ExecuteDeleteAsync();
+    // Remove the linked shopping item too, unless it was already bought
+    var removed = await db.ShoppingItems
+        .Where(item => item.Id == ingredient.ShoppingItemId && !item.IsComplete)
+        .ExecuteDeleteAsync();
+    if (removed > 0)
+        await hubContext.Clients.All.SendAsync("ItemDeleted", ingredient.ShoppingItemId);
+    return Results.Json(new { success = true, message = $"Deleted ingredient  {id}" });
 });
 
 app.MapGet("/auth/whoami", (HttpContext ctx) =>

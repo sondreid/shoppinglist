@@ -15,6 +15,7 @@
   <script type="text/javascript" src="js/app.js"></script>
   <script type="text/javascript" src="js/auth.js"></script>
   <script type="text/javascript" src="js/offline.js"></script>
+  <script type="text/javascript" src="js/dinner.js"></script>
   <script src="https://unpkg.com/@microsoft/signalr@latest/dist/browser/signalr.min.js"></script>
   <!-- GLightbox for image viewing -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css" />
@@ -32,10 +33,14 @@
 
     <div id="offline-banner" class="offline-banner">You are offline</div>
 
-    <h1 style="text-align: center;">Shoppinglist</h1>
-    
+    <h1 id="page-title" style="text-align: center;">Shoppinglist</h1>
 
-    <div class="list-container">
+    <div class="tab-bar">
+      <button type="button" id="tab-shopping" class="tab-btn active" onclick="showTab('shopping')">Shopping</button>
+      <button type="button" id="tab-dinner" class="tab-btn" onclick="showTab('dinner')">Dinner</button>
+    </div>
+
+    <div id="shopping-container" class="list-container">
 
       <div class="input-row">
         <input type="text" class="form-control" id="newItemInput" placeholder="New item"
@@ -63,6 +68,19 @@
 
     </div>
 
+    <div id="dinner-container" class="list-container" style="display: none;">
+
+      <div class="week-nav">
+        <button type="button" class="btn btn-default btn-sm" onclick="dinnerPlanner.changeWeek(-1)">‹</button>
+        <span id="week-label"></span>
+        <button type="button" class="btn btn-default btn-sm" onclick="dinnerPlanner.changeWeek(1)">›</button>
+      </div>
+
+      <div id="dinner-days">
+      </div>
+
+    </div>
+
 
 
 
@@ -71,6 +89,15 @@
 
 
     <script>
+
+      function showTab(tab) {
+        document.getElementById('shopping-container').style.display = tab === 'shopping' ? '' : 'none';
+        document.getElementById('dinner-container').style.display = tab === 'dinner' ? '' : 'none';
+        document.getElementById('tab-shopping').classList.toggle('active', tab === 'shopping');
+        document.getElementById('tab-dinner').classList.toggle('active', tab === 'dinner');
+        document.getElementById('page-title').textContent = tab === 'dinner' ? 'Dinner planner' : 'Shoppinglist';
+        if (tab === 'dinner') dinnerPlanner.show();
+      }
 
       // Initialize GLightbox
       let lightbox;

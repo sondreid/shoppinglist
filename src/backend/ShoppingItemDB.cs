@@ -9,6 +9,8 @@ public class ShoppingItemDB : DbContext
 
     public DbSet<ShoppingItem> ShoppingItems => Set<ShoppingItem>();
     public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<DinnerPlan> DinnerPlans => Set<DinnerPlan>();
+    public DbSet<DinnerIngredient> DinnerIngredients => Set<DinnerIngredient>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
