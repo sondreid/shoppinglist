@@ -79,6 +79,41 @@ body {
     font-size: 1.1rem;
 }
 
+/* Quantity stepper */
+.qty-controls {
+    margin-left: auto;
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.qty-btn {
+    background: none;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    line-height: 1;
+    font-size: 1rem;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.qty-btn:hover {
+    opacity: 1;
+}
+
+.qty-value {
+    min-width: 1.5em;
+    text-align: center;
+    align-self: center;
+}
+
+.completed-qty {
+    opacity: 0.6;
+    font-size: 0.9em;
+}
+
 /* Completed items */
 .completed-checkbox {
     accent-color: gray;

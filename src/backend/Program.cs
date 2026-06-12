@@ -93,6 +93,16 @@ using (var scope = app.Services.CreateScope())
     Directory.CreateDirectory("data");
     var db = scope.ServiceProvider.GetRequiredService<ShoppingItemDB>();
     db.Database.EnsureCreated();
+    // EnsureCreated() never alters an existing database, so add columns
+    // introduced after the first deploy by hand.
+    try
+    {
+        db.Database.ExecuteSqlRaw("ALTER TABLE ShoppingItems ADD COLUMN Quantity INTEGER NOT NULL DEFAULT 1");
+    }
+    catch (Microsoft.Data.Sqlite.SqliteException)
+    {
+        // Column already exists.
+    }
 }
 
 app.UseCors(allowOrigins);
@@ -238,6 +248,7 @@ app.MapPost("/shoppingitem", async (ShoppingItem item, ShoppingItemDB db, IHubCo
     if (item.IsImage && (item.Image == null || string.IsNullOrEmpty(item.Image.ContentType)))
         return Results.Json(new { success = false, message = "Missing image data for image item." }, statusCode: 400);
 
+    item.Quantity = Math.Max(1, item.Quantity);
     item.UpdatedAt = DateTime.UtcNow;
     db.ShoppingItems.Add(item);
     await db.SaveChangesAsync();
@@ -254,6 +265,7 @@ app.MapPut("/shoppingitem/{id}",
         if (item == null) return Results.NotFound();
         item.Name = updatedItem.Name;
         item.IsComplete = updatedItem.IsComplete;
+        item.Quantity = Math.Max(1, updatedItem.Quantity);
         item.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         await hubContext.Clients.All.SendAsync("ItemUpdated", item);

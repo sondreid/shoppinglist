@@ -88,6 +88,59 @@
         return `data:${item.image.contentType};base64,${item.image.imageBinary}`;
       }
 
+      // Quantity lives in its own column; the input box still accepts an
+      // " xN" suffix as a shortcut ("milk x3" adds quantity 3).
+      function parseQtyInput(text) {
+        const m = /^(.*\S)\s+x(\d+)$/i.exec(text || '');
+        if (m) return { name: m[1], qty: Math.max(1, parseInt(m[2], 10)) };
+        return { name: (text || '').trim(), qty: 1 };
+      }
+
+      function findUncompletedByName(name) {
+        const labels = document.querySelectorAll('#checkbox-container label.form-check-label');
+        for (const label of labels) {
+          if (label.textContent.trim().toLowerCase() === name.toLowerCase()) {
+            const row = label.closest('.form-check');
+            return {
+              id: parseInt(label.htmlFor.replace('item', ''), 10),
+              name: label.textContent.trim(),
+              qty: parseInt(row?.dataset.qty || '1', 10)
+            };
+          }
+        }
+        return null;
+      }
+
+      function applyQtyToRow(itemId, qty) {
+        const row = document.getElementById(`item${itemId}`)?.parentNode;
+        if (row) row.dataset.qty = qty;
+        const value = document.getElementById(`qty${itemId}`);
+        if (value) value.textContent = qty;
+      }
+
+      function setQty(itemId, name, qty) {
+        return fetch(`${auth.getApiBase()}/shoppingitem/${itemId}`, {
+          method: 'PUT',
+          headers: auth.getAuthHeaders(),
+          body: JSON.stringify({ id: itemId, name: name, isComplete: false, quantity: qty })
+        })
+          .then(handleJson)
+          .then(() => applyQtyToRow(itemId, qty))
+          .catch((error) => {
+            console.error('Error:', error);
+          });
+      }
+
+      function changeQty(itemId, delta) {
+        const label = document.querySelector(`label[for="item${itemId}"]`);
+        const row = document.getElementById(`item${itemId}`)?.parentNode;
+        if (!label || !row) return;
+        const qty = parseInt(row.dataset.qty || '1', 10);
+        const newQty = qty + delta;
+        if (newQty < 1 || newQty === qty) return;
+        setQty(itemId, label.textContent, newQty);
+      }
+
       let itemCount = 1;
       let completedOffset = 0;
       const COMPLETED_PAGE_SIZE = 100;
@@ -150,11 +203,21 @@
             }
           });
         } else {
+          // Adding a name that is already on the list bumps its quantity
+          // instead of creating a duplicate row.
+          const incoming = parseQtyInput(itemText);
+          const existing = findUncompletedByName(incoming.name);
+          if (existing) {
+            setQty(existing.id, existing.name, existing.qty + incoming.qty);
+            newItemInput.value = '';
+            return;
+          }
           sendItem({
-            Name: itemText,
+            Name: incoming.name,
             IsComplete: false,
             IsImage: false,
-            Image: null
+            Image: null,
+            Quantity: incoming.qty
           });
         }
       }
@@ -188,7 +251,7 @@
         })
           .then(handleJson)
           .then(page => {
-            page.items.forEach(addItemToCheckMarked);
+            page.items.forEach(item => addItemToCheckMarked(item, true));
             completedOffset += page.items.length;
             updateLoadMoreButton(page.hasMore);
             refreshLightbox();
@@ -211,7 +274,7 @@
         ])
           .then(([uncompleted, completedPage]) => {
             uncompleted.forEach(item => shoppingList.addItemToForm(item));
-            completedPage.items.forEach(addItemToCheckMarked);
+            completedPage.items.forEach(item => addItemToCheckMarked(item, true));
             completedOffset = completedPage.items.length;
             updateLoadMoreButton(completedPage.hasMore);
             refreshLightbox();
@@ -241,9 +304,30 @@
         console.log('Resync triggered:', reason);
         const conn = window._hub;
         if (conn && conn.state === signalR.HubConnectionState.Disconnected) {
-          conn.start().catch(err => console.error('Manual reconnect failed:', err));
+          // Reconnect before resyncing, so changes made while the resync
+          // fetch is in flight arrive as events instead of being missed.
+          conn.start()
+            .then(() => fullResync())
+            .catch(err => {
+              console.error('Manual reconnect failed:', err);
+              fullResync();
+            });
+        } else {
+          fullResync();
         }
-        fullResync();
+      }
+
+      let hubRestartTimer = null;
+      function scheduleHubRestart() {
+        if (hubRestartTimer) return;
+        hubRestartTimer = setTimeout(() => {
+          hubRestartTimer = null;
+          const conn = window._hub;
+          if (!conn || conn.state !== signalR.HubConnectionState.Disconnected) return;
+          conn.start()
+            .then(() => fullResync())
+            .catch(() => scheduleHubRestart());
+        }, 5000);
       }
 
       document.addEventListener('visibilitychange', () => {
@@ -275,8 +359,10 @@
             window.location.href = 'index.html';
             return;
           }
-          loadItems();
-          initializeSignalR();
+          // Connect the hub before the initial load, so items created while
+          // the load is in flight arrive as events instead of being missed.
+          // Duplicate renders are prevented by the per-id guards.
+          initializeSignalR().then(() => loadItems());
         });
       });
 
@@ -287,10 +373,12 @@
 
 
         let isComplete = document.getElementById(`item${itemId}`).checked;
+        let rowQty = parseInt(document.getElementById(`item${itemId}`)?.parentNode?.dataset.qty || '1', 10);
         let newItem = JSON.stringify({
           id: itemId,
           name: document.querySelector(`label[for="item${itemId}"]`)?.textContent || null,
-          isComplete: isComplete
+          isComplete: isComplete,
+          quantity: rowQty
         });
 
         fetch(`${auth.getApiBase()}/shoppingitem/${itemId}`, {
@@ -308,7 +396,7 @@
               const checkboxDiv = document.getElementById(`item${itemId}`)?.parentNode;
               const itemName = document.querySelector(`label[for="item${itemId}"]`)?.textContent || null;
               const imgEl = checkboxDiv?.querySelector('img');
-              const itemData = { id: itemId, name: itemName };
+              const itemData = { id: itemId, name: itemName, quantity: rowQty };
               if (imgEl) {
                 const src = imgEl.src;
                 const contentType = src.split(';')[0].split(':')[1];
@@ -327,7 +415,7 @@
 
       };
 
-      function addItemToCheckMarked(item) {
+      function addItemToCheckMarked(item, atEnd = false) {
         let checkedContainer = document.getElementById('checked-items-container');
 
         if (document.getElementById(`completed-item${item.id}`)) {
@@ -337,6 +425,7 @@
         const itemDiv = document.createElement('div');
         itemDiv.className = 'checked-item d-flex align-items-center gap-2 mb-2';
         itemDiv.id = `completed-item${item.id}`;
+        itemDiv.dataset.qty = item.quantity || 1;
 
         let content = `
           <input type="checkbox" class="form-check-input completed-checkbox" checked
@@ -353,15 +442,20 @@
         }
 
         if (item.name) {
-          content += `<span style="text-decoration: line-through;">${item.name}</span>`;
+          content += `<span class="completed-name" style="text-decoration: line-through;">${item.name}</span>`;
+        }
+        if ((item.quantity || 1) > 1) {
+          content += `<span class="completed-qty">×${item.quantity}</span>`;
         }
 
         content += `<button type="button" class="delete-completed" aria-label="Delete" onclick="deleteItem(${item.id})">🗑</button>`;
 
         itemDiv.innerHTML = content;
-        // Insert at the top (after the h5 heading) so last-completed appears first
+        // Live completions go to the top (last-completed first). Loading uses
+        // atEnd: the API returns pages newest-first, so appending keeps that
+        // order and "Load more" pages land below the ones already shown.
         const heading = checkedContainer.querySelector('h5');
-        if (heading && heading.nextSibling) {
+        if (!atEnd && heading && heading.nextSibling) {
           checkedContainer.insertBefore(itemDiv, heading.nextSibling);
         } else {
           checkedContainer.appendChild(itemDiv);
@@ -371,12 +465,13 @@
 
       function uncompleteItem(itemId, checkbox) {
         const completedDiv = document.getElementById(`completed-item${itemId}`);
-        const itemName = completedDiv?.querySelector('span')?.textContent || null;
+        const itemName = completedDiv?.querySelector('span.completed-name')?.textContent || null;
+        const itemQty = parseInt(completedDiv?.dataset.qty || '1', 10);
 
         fetch(`${auth.getApiBase()}/shoppingitem/${itemId}`, {
           method: 'PUT',
           headers: auth.getAuthHeaders(),
-          body: JSON.stringify({ id: itemId, name: itemName, isComplete: false })
+          body: JSON.stringify({ id: itemId, name: itemName, isComplete: false, quantity: itemQty })
         })
           .then(response => {
             if (response.status === 401) { auth.handleUnauthorized(); return Promise.reject(new Error('Unauthorized')); }
@@ -385,7 +480,7 @@
           .then(data => {
             console.log('Uncompleted:', data);
             if (completedDiv) completedDiv.remove();
-            shoppingList.addItemToForm({ id: itemId, name: itemName });
+            shoppingList.addItemToForm({ id: itemId, name: itemName, quantity: itemQty });
           })
           .catch(error => {
             console.error('Error:', error);
@@ -407,41 +502,75 @@
           .build();
         window._hub = connection;
 
-        connection.start().then(() => {
-          connection.on("ItemCreated", (item) => {
-            console.log("Item created via SignalR:", item);
-            shoppingList.addItemToForm(item);
-          });
-          connection.on("ItemUpdated", (item) => {
-            console.log("Item updated via SignalR:", item);
+        // Handlers must be registered before start(); events that arrive
+        // between connecting and subscribing are dropped, not queued.
+        connection.on("ItemCreated", (item) => {
+          console.log("Item created via SignalR:", item);
+          shoppingList.addItemToForm(item);
+        });
+        connection.on("ItemUpdated", (item) => {
+          console.log("Item updated via SignalR:", item);
 
-            if (item.isComplete) {
-              const checkboxDiv = document.getElementById(`item${item.id}`)?.parentNode;
-              if (checkboxDiv) {
-                checkboxDiv.remove();
-              }
-              addItemToCheckMarked(item);
-            } else {
-              const completedDiv = document.getElementById(`completed-item${item.id}`);
-              if (completedDiv) {
-                completedDiv.remove();
-              }
-              if (!document.getElementById(`item${item.id}`)) {
-                shoppingList.addItemToForm(item);
+          if (item.isComplete) {
+            const checkboxDiv = document.getElementById(`item${item.id}`)?.parentNode;
+            // The ItemUpdated broadcast carries no image binary, so salvage
+            // the thumbnail from the row being replaced.
+            if (item.isImage && !item.image) {
+              const src = checkboxDiv?.querySelector('img')?.src;
+              if (src) {
+                item.image = {
+                  contentType: src.split(';')[0].split(':')[1],
+                  imageBinary: src.split(',')[1]
+                };
               }
             }
-          });
-          connection.on("ItemDeleted", (id) => {
-            console.log("Item deleted via SignalR:", id);
-            document.getElementById(`completed-item${id}`)?.remove();
-            document.getElementById(`item${id}`)?.parentNode?.remove();
-          });
-          connection.onreconnected(() => {
-            console.log('SignalR reconnected — full resync');
-            fullResync();
-          });
-        }).catch(err => {
+            if (checkboxDiv) {
+              checkboxDiv.remove();
+            }
+            addItemToCheckMarked(item);
+          } else {
+            const completedDiv = document.getElementById(`completed-item${item.id}`);
+            if (item.isImage && !item.image) {
+              const src = completedDiv?.querySelector('img')?.src;
+              if (src) {
+                item.image = {
+                  contentType: src.split(';')[0].split(':')[1],
+                  imageBinary: src.split(',')[1]
+                };
+              }
+            }
+            if (completedDiv) {
+              completedDiv.remove();
+            }
+            if (!document.getElementById(`item${item.id}`)) {
+              shoppingList.addItemToForm(item);
+            } else {
+              // Apply renames and quantity changes to the existing row.
+              const label = document.querySelector(`label[for="item${item.id}"]`);
+              if (label && item.name && label.textContent !== item.name) {
+                label.textContent = item.name;
+              }
+              applyQtyToRow(item.id, item.quantity || 1);
+            }
+          }
+        });
+        connection.on("ItemDeleted", (id) => {
+          console.log("Item deleted via SignalR:", id);
+          document.getElementById(`completed-item${id}`)?.remove();
+          document.getElementById(`item${id}`)?.parentNode?.remove();
+        });
+        connection.onreconnected(() => {
+          console.log('SignalR reconnected — full resync');
+          fullResync();
+        });
+        connection.onclose(() => {
+          // Fires when automatic reconnect has given up.
+          scheduleHubRestart();
+        });
+
+        return connection.start().catch(err => {
           console.error("SignalR connection error:", err);
+          scheduleHubRestart();
         });
       }
 
