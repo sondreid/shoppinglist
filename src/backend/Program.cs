@@ -93,21 +93,7 @@ using (var scope = app.Services.CreateScope())
     Directory.CreateDirectory("data");
     var db = scope.ServiceProvider.GetRequiredService<ShoppingItemDB>();
     db.Database.EnsureCreated();
-    // EnsureCreated does nothing when the database already exists, so create newer tables explicitly
-    db.Database.ExecuteSqlRaw("""
-        CREATE TABLE IF NOT EXISTS "DinnerPlans" (
-            "Id" INTEGER NOT NULL CONSTRAINT "PK_DinnerPlans" PRIMARY KEY AUTOINCREMENT,
-            "Date" TEXT NOT NULL,
-            "Recipe" TEXT NULL,
-            "UpdatedAt" TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS "DinnerIngredients" (
-            "Id" INTEGER NOT NULL CONSTRAINT "PK_DinnerIngredients" PRIMARY KEY AUTOINCREMENT,
-            "DinnerPlanId" INTEGER NOT NULL,
-            "ShoppingItemId" INTEGER NOT NULL,
-            "Name" TEXT NULL
-        );
-        """);
+    db.EnsureDinnerTables();
 }
 
 app.UseCors(allowOrigins);
@@ -315,9 +301,22 @@ app.MapPost("/dinnerplan", async (DinnerPlan plan, ShoppingItemDB db) =>
     var existing = await db.DinnerPlans.FirstOrDefaultAsync(p => p.Date == plan.Date);
     if (existing == null)
     {
-        existing = new DinnerPlan { Date = plan.Date };
-        db.DinnerPlans.Add(existing);
+        var created = new DinnerPlan { Date = plan.Date, Recipe = plan.Recipe, UpdatedAt = DateTime.UtcNow };
+        db.DinnerPlans.Add(created);
+        try
+        {
+            await db.SaveChangesAsync();
+            return Results.Json(new { success = true, plan = created });
+        }
+        catch (DbUpdateException)
+        {
+            // Another client created this day first (UNIQUE(Date) collision).
+            // Fall through and update that row instead of failing.
+            db.Entry(created).State = EntityState.Detached;
+            existing = await db.DinnerPlans.FirstAsync(p => p.Date == plan.Date);
+        }
     }
+
     existing.Recipe = plan.Recipe;
     existing.UpdatedAt = DateTime.UtcNow;
     await db.SaveChangesAsync();
@@ -352,7 +351,6 @@ app.MapDelete("/dinneringredient/{id}", async (int id, ShoppingItemDB db, IHubCo
 
     // ExecuteDelete tolerates the row already being gone (e.g. duplicate requests)
     await db.DinnerIngredients.Where(i => i.Id == id).ExecuteDeleteAsync();
-    // Remove the linked shopping item too, unless it was already bought
     var removed = await db.ShoppingItems
         .Where(item => item.Id == ingredient.ShoppingItemId && !item.IsComplete)
         .ExecuteDeleteAsync();
@@ -387,6 +385,6 @@ app.MapGet("/health", () => new { payload = "A-okay" });
 if (devMode)
 {
     app.UseSwagger();
-    app.UseSwaggerUI(); // Access at /swagger
+    app.UseSwaggerUI();
 }
 app.Run(devMode ? "http://localhost:5058" : "http://0.0.0.0:5058");
