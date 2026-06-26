@@ -84,8 +84,13 @@ const dinnerPlanner = {
           `;
         }
         content += `
-          <input type="text" class="form-control dinner-ingredient-input" placeholder="Add ingredient" data-plan-id="${plan.id}"
-            onkeypress="if(event.key === 'Enter') dinnerPlanner.addIngredient(${plan.id}, this);">
+          <div class="input-row">
+            <input type="text" class="form-control dinner-ingredient-input" placeholder="Add ingredient" data-plan-id="${plan.id}"
+              onkeypress="if(event.key === 'Enter') dinnerPlanner.addIngredient(${plan.id}, this);">
+            <div class="input-actions">
+              <button type="button" class="btn btn-primary" onclick="dinnerPlanner.addIngredient(${plan.id}, this.closest('.input-row').querySelector('.dinner-ingredient-input'))">Add</button>
+            </div>
+          </div>
         </div>`;
       }
 

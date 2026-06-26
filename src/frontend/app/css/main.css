@@ -260,8 +260,6 @@ body {
 }
 
 .dinner-ingredient-input {
-    margin-top: 0.25rem;
-    max-width: 60%;
     font-size: 0.9rem;
     height: 28px;
 }
