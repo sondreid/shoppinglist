@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 
-namespace handleliste.Hubs
+namespace handleliste.Web.Hubs
 {
     public class ItemHub : Hub
     {

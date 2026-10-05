@@ -1,4 +1,4 @@
-namespace handleliste;
+namespace handleliste.Business.Models;
 
 public class ImageMessage {
     public string FileName { get; set; } = string.Empty;

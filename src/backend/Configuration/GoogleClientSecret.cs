@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace handleliste.Models;
+namespace handleliste.Configuration;
 
 public class GoogleClientSecret
 {

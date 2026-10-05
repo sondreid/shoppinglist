@@ -1,4 +1,4 @@
-namespace handleliste;
+namespace handleliste.Web.Models;
 
 public class ImageRequest
 {

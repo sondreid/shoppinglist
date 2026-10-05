@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace handleliste.Models;
+namespace handleliste.Business.Models;
 
 public class Session
 {

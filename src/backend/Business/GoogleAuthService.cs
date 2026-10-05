@@ -1,9 +1,10 @@
 using Google.Apis.Auth;
-using handleliste.Models;
+using handleliste.Configuration;
+using handleliste.Web.Models;
 using Microsoft.Extensions.Configuration;
 using System.Text.Json;
 
-namespace handleliste.Services;
+namespace handleliste.Business;
 
 public class GoogleAuthService
 {

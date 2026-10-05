@@ -1,11 +1,10 @@
-using handleliste;
-using handleliste.Hubs;
-using handleliste.Middleware;
-using handleliste.Models;
-using handleliste.Services;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.Http;
+using handleliste.Business;
+using handleliste.Business.Models;
+using handleliste.Configuration;
+using handleliste.DataAccess;
+using handleliste.Web.Hubs;
+using handleliste.Web.Middleware;
+using handleliste.Web.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.OpenApi.Models;
 using Microsoft.EntityFrameworkCore;
@@ -148,7 +147,7 @@ app.MapPost("/auth/google", async (AuthRequest request, GoogleAuthService authSe
     }
 
     var sessionToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-    db.Sessions.Add(new handleliste.Models.Session
+    db.Sessions.Add(new Session
     {
         Token = sessionToken,
         Email = user.Email,
@@ -168,7 +167,7 @@ if (ssoOverride)
         var sessionToken = Convert.ToHexString(
             System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
         var user = new UserInfo { Email = "dev@local", Name = "Dev User" };
-        db.Sessions.Add(new handleliste.Models.Session
+        db.Sessions.Add(new Session
         {
             Token = sessionToken,
             Email = user.Email,

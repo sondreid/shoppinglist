@@ -1,4 +1,4 @@
-using handleliste;
+namespace handleliste.Business.Models;
 
 public class ShoppingItem
 {

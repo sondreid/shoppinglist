@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using handleliste;
-using handleliste.Models;
+using handleliste.Business.Models;
+
+namespace handleliste.DataAccess;
 
 public class ShoppingItemDB : DbContext
 {

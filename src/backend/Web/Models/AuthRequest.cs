@@ -1,4 +1,4 @@
-namespace handleliste.Models;
+namespace handleliste.Web.Models;
 
 public class AuthRequest
 {

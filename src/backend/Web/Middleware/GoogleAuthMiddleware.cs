@@ -1,8 +1,9 @@
-using handleliste.Models;
+using handleliste.DataAccess;
+using handleliste.Web.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
-namespace handleliste.Middleware;
+namespace handleliste.Web.Middleware;
 
 public class GoogleAuthMiddleware
 {

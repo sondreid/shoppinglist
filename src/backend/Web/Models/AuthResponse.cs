@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace handleliste.Models;
+namespace handleliste.Web.Models;
 
 public class AuthResponse
 {

@@ -1,3 +1,5 @@
+namespace handleliste.Business.Models;
+
 public class DinnerIngredient
 {
     public int Id { get; set; }
